@@ -8,34 +8,26 @@ import {
 	SettingsIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
-import {
-	DONATE_LINK,
-	GITHUB_REPO_LINK,
-	VERSION_DISPLAY,
-	WEBSITE_LINK,
-} from '@/lib/version'
+import { VERSION_DISPLAY } from '@/lib/version'
 import { Separator } from './ui/separator'
 import { Link } from 'react-router-dom'
-import { handleExternalLinkClick } from '@/lib/openExternalUrl'
 import { IS_PAIRING_CAPABLE, IS_TAURI } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import { useAppSettingStore } from '@/store/app-setting'
 import { useSenderStore } from '@/store/sender-store'
 import { RelayStatusButton } from './RelayStatusButton'
 
+// Placeholders: external links removed.
 const CONTACTS = [
 	{
-		link: GITHUB_REPO_LINK,
 		icon: <GithubIcon />,
 		'aria-label': 'Github source code',
 	},
 	{
-		link: DONATE_LINK,
 		icon: <CoffeeIcon />,
 		'aria-label': 'Buy me a coffee',
 	},
 	{
-		link: WEBSITE_LINK,
 		icon: <GlobeIcon />,
 		'aria-label': 'DashBeam website',
 	},
@@ -65,23 +57,20 @@ export function AppFooter() {
 				<Separator className="hidden h-6 sm:block" orientation="vertical" />
 
 				{CONTACTS.map((contact) => (
-					<a
-						key={contact.link}
-						href={contact.link}
-						onClick={(event) => handleExternalLinkClick(event, contact.link)}
-						target="_blank"
-						rel="noopener noreferrer"
+					<span
+						key={contact['aria-label']}
+						aria-disabled
 						aria-label={contact['aria-label']}
 						className={cn(
 							buttonVariants({
 								size: 'icon-sm',
 								variant: 'outline',
 							}),
-							'hidden sm:inline-flex'
+							'hidden sm:inline-flex pointer-events-none opacity-64'
 						)}
 					>
 						{contact.icon}
-					</a>
+					</span>
 				))}
 			</div>
 			<div className="flex flex-1 items-center justify-end gap-2">

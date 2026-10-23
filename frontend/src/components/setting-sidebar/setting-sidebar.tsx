@@ -3,10 +3,9 @@ import {
 	Highlight,
 	HighlightItem,
 } from '@/components/animate-ui/primitives/effects/highlight'
-import { handleExternalLinkClick } from '@/lib/openExternalUrl'
 import { useTranslation } from '../../i18n'
 import { cn } from '../../lib/utils'
-import { LICENSE_LINK, PRIVACY_LINK, VERSION_DISPLAY } from '../../lib/version'
+import { VERSION_DISPLAY } from '../../lib/version'
 import { BackArrowIcon } from '../back-arrow-icon'
 import { LazyIcon } from '../icons'
 import { Badge } from '../ui/badge'
@@ -175,28 +174,12 @@ function SettingSidebarFooter({
 			)}
 			{...props}
 		>
-			{/*TODO: Add link*/}
+			{/* Placeholders: external links removed. */}
 			<span>{VERSION_DISPLAY}</span>
 			<div className="size-1 rounded-full bg-muted-foreground" />
-			<a
-				className="hover:underline hover:text-foreground transition-color"
-				href={PRIVACY_LINK}
-				onClick={(event) => handleExternalLinkClick(event, PRIVACY_LINK)}
-				target="_blank"
-				rel="noopener noreferrer"
-			>
-				{t('privacyPolicy')}
-			</a>
+			<span>{t('privacyPolicy')}</span>
 			<div className="size-1 rounded-full bg-muted-foreground" />
-			<a
-				className="hover:underline hover:text-foreground transition-color"
-				href={LICENSE_LINK}
-				onClick={(event) => handleExternalLinkClick(event, LICENSE_LINK)}
-				target="_blank"
-				rel="noopener noreferrer"
-			>
-				{t('license')}
-			</a>
+			<span>{t('license')}</span>
 		</SidebarFooter>
 	)
 }
