@@ -207,12 +207,13 @@ function stagePortablePayload(releaseDir, stagingAppDir) {
 		path.join(repoRoot, 'src-tauri', 'resources', 'WebView2Loader.dll'),
 	]
 	const loader = loaderCandidates.find((candidate) => fs.existsSync(candidate))
-	if (!loader) {
-		throw new Error(
-			`WebView2Loader.dll not found in ${releaseDir} or src-tauri/resources`
+	if (loader) {
+		copyFile(loader, path.join(stagingAppDir, 'WebView2Loader.dll'))
+	} else {
+		console.warn(
+			'WebView2Loader.dll not found; relying on the system WebView2 runtime'
 		)
 	}
-	copyFile(loader, path.join(stagingAppDir, 'WebView2Loader.dll'))
 
 	stageResources(releaseDir, stagingAppDir)
 
