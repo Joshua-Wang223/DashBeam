@@ -8,9 +8,6 @@ on:
         description: 'Version to stamp (defaults to package.json)'
         required: false
         type: string
-  push:
-    tags:
-      - 'v*.*.*'
 
 jobs:
   android-play-aab:
