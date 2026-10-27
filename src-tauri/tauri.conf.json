@@ -75,7 +75,7 @@
 		},
 		"updater": {
 			"endpoints": [
-				"https://github.com/tonyantony300/dashbeam/releases/latest/download/latest.json"
+				"https://github.com/Joshua-Wang223/DashBeam/releases/latest/download/latest.json"
 			],
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUzOEQ1RDY2NDU5MzVDMzkKUldRNVhKTkZabDJONHdHd1VsWEpTRVBIUjRWU0VoMUEzNVFLS1VGcUFyNFJuaVh1b292YzI3M3MK"
 		}
