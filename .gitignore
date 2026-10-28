@@ -1,3 +1,6 @@
+frontend/src/components/AppFooter.tsx
+frontend/src/components/setting-sidebar/setting-sidebar.tsx
+
 # Rust build artifacts
 /target
 **/target
