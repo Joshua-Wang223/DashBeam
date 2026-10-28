@@ -398,9 +398,144 @@ jobs:
 
           gh release upload "$RELEASE_TAG" "$SIDECAR" --clobber
 
+  android-release-apks:
+    name: Android release APKs
+    needs: prepare-release
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.12.1
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: build-tools;36.0.0 platform-tools platforms;android-36
+
+      - name: Set up NDK
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779
+        id: setup-ndk
+        with:
+          ndk-version: r28b
+          local-cache: true
+
+      - name: NDK and SDK env
+        shell: bash
+        run: |
+          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          if [ -n "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -z "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set Rust 1.91 and Android targets
+        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249 # 1.91.0
+        with:
+          components: rustfmt
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Install WASM build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          workspaces: './src-tauri -> target'
+          key: ubuntu-22.04-android-cargo
+
+      - name: Extract version from tag and sync
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          pnpm pkg set version="$VERSION"
+          pnpm run sync-version
+          node scripts/validate-version.js
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Only the sideloaded APKs check GitHub for a newer release. The Play
+      # AAB must not: Play forbids an app updating itself outside Play, and
+      # Play App Signing re-signs it, so its users could not install these
+      # APKs over their copy anyway. `android-aab.yml` deliberately omits it.
+      - name: Build release APKs (universal + per-ABI)
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_APK_PROFILES: universal,arm64,armv7
+          VITE_ANDROID_UPDATE_CHECK: 'true'
+        run: pnpm run android:build:release
+
+      - name: Upload Android APKs to GitHub release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASE_ID" ]; then
+            echo "ERROR: release id missing (prepare-release should have created it)"
+            exit 1
+          fi
+          declare -A APKS=(
+            [universal]="build/android-apks/app-universal-release.apk"
+            [arm64]="build/android-apks/app-arm64-release.apk"
+            [armv7]="build/android-apks/app-armv7-release.apk"
+          )
+          for variant in universal arm64 armv7; do
+            APK="${APKS[$variant]}"
+            if [ ! -f "$APK" ]; then
+              echo "ERROR: expected signed APK at $APK (check keystore and apksigner log above)"
+              ls -la "$(dirname "$APK")" 2>&1 || true
+              exit 1
+            fi
+            RENAME="DashBeam-${TAG}-${variant}.apk"
+            cp "$APK" "$RENAME"
+            echo "Uploading $RENAME to release $TAG"
+            ASSET_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets" \
+              --jq ".[] | select(.name == \"${RENAME}\") | .id // empty")
+            if [ -n "$ASSET_ID" ]; then
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${ASSET_ID}" >/dev/null
+            fi
+            gh api --method POST \
+              -H "Content-Type: application/vnd.android.package-archive" \
+              --input "$RENAME" \
+              "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${RENAME}" >/dev/null
+          done
+
   finalize-release:
     name: Finalize draft release
-    needs: [prepare-release, publish-tauri]
+    needs: [prepare-release, publish-tauri, android-release-apks]
     permissions:
       contents: write
     runs-on: ubuntu-latest
