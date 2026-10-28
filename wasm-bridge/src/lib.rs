@@ -1,10 +1,5 @@
 //! WASM bridge: wasm-bindgen exports over `wasm-io` + `protocol`.
 
-use wasm_io::{
-    download_files, fetch_metadata, start_share_bytes, start_share_items_bytes,
-    AddrInfoOptions, AppHandle, EventEmitter, FileMetadata, ReceiveOptions, RelayModeOption,
-    SendOptions, WasmReceiveResult, WasmShareSession,
-};
 use protocol::{
     get_relay_status as engine_get_relay_status, resolve_relay_mode_with_fallback,
     set_wasm_secret_key, verify_relays as engine_verify_relays, with_system_ca_if_custom,
@@ -13,6 +8,11 @@ use protocol::{
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, OnceLock};
 use wasm_bindgen::prelude::*;
+use wasm_io::{
+    download_files, fetch_metadata, start_share_bytes, start_share_items_bytes, AddrInfoOptions,
+    AppHandle, EventEmitter, FileMetadata, ReceiveOptions, RelayModeOption, SendOptions,
+    WasmReceiveResult, WasmShareSession,
+};
 
 #[wasm_bindgen(start)]
 pub fn init() {
@@ -60,9 +60,11 @@ fn share_slot() -> &'static Mutex<Option<WasmShareSession>> {
 
 fn app_handle() -> AppHandle {
     let guard = event_slot().lock().expect("event callback mutex poisoned");
-    guard
-        .as_ref()
-        .map(|callback| Arc::new(JsEventEmitter { callback: callback.clone() }) as Arc<dyn EventEmitter>)
+    guard.as_ref().map(|callback| {
+        Arc::new(JsEventEmitter {
+            callback: callback.clone(),
+        }) as Arc<dyn EventEmitter>
+    })
 }
 
 fn js_err(err: impl std::fmt::Display) -> JsValue {
@@ -274,23 +276,14 @@ pub async fn send_items(
     };
 
     let session = if items.len() == 1 && entry_type == "file" {
-        let (file_name, bytes) = items
-            .into_iter()
-            .next()
-            .expect("validated non-empty items");
+        let (file_name, bytes) = items.into_iter().next().expect("validated non-empty items");
         start_share_bytes(file_name, bytes, options, &app_handle(), metadata)
             .await
             .map_err(js_err)?
     } else {
-        start_share_items_bytes(
-            items,
-            entry_type,
-            options,
-            &app_handle(),
-            metadata,
-        )
-        .await
-        .map_err(js_err)?
+        start_share_items_bytes(items, entry_type, options, &app_handle(), metadata)
+            .await
+            .map_err(js_err)?
     };
 
     let result = WasmSendResult {
@@ -306,7 +299,10 @@ pub async fn send_items(
 /// Stop the active browser share session, if any.
 #[wasm_bindgen]
 pub fn stop_sharing() {
-    let _ = share_slot().lock().expect("share session mutex poisoned").take();
+    let _ = share_slot()
+        .lock()
+        .expect("share session mutex poisoned")
+        .take();
 }
 
 /// Fetch sender metadata JSON for a ticket (no file download).
@@ -322,6 +318,9 @@ pub async fn fetch_ticket_metadata(
         discovery_mode: Default::default(),
         magic_ipv4_addr: None,
         magic_ipv6_addr: None,
+        // Browser builds are always sequential; see `wasm_io::download_files`.
+        split_strategy: protocol::SplitStrategy::None,
+        max_concurrency: None,
     };
 
     let metadata = fetch_metadata(ticket, options).await.map_err(js_err)?;
@@ -341,10 +340,14 @@ pub async fn receive_file(
         discovery_mode: Default::default(),
         magic_ipv4_addr: None,
         magic_ipv6_addr: None,
+        // Browser builds are always sequential; see `wasm_io::download_files`.
+        split_strategy: protocol::SplitStrategy::None,
+        max_concurrency: None,
     };
 
-    let WasmReceiveResult { files } =
-        download_files(ticket, options, app_handle()).await.map_err(js_err)?;
+    let WasmReceiveResult { files } = download_files(ticket, options, app_handle())
+        .await
+        .map_err(js_err)?;
 
     let file_names = files.iter().map(|(name, _)| name.clone()).collect();
     let bytes_js = files_to_js_array(&files);

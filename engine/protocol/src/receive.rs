@@ -163,6 +163,7 @@ pub async fn download_to_store(
             {
                 // Browsers cap per-host streams and the wasm-io path cannot
                 // spawn freely; stay sequential there.
+                let _ = max_concurrency;
                 download_sequential(&addr, endpoint, db, app_handle, hash_and_format, local).await?
             }
         } else {

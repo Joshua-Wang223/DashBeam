@@ -1,6 +1,6 @@
 use protocol::{
     download_to_store, get_or_create_secret, uses_custom_infra, with_system_ca_if_custom,
-    AppHandle, ReceiveOptions,
+    AppHandle, ReceiveOptions, SplitStrategy,
 };
 use iroh::endpoint::presets;
 use iroh::Endpoint;
@@ -37,8 +37,18 @@ pub async fn download_files(
     let endpoint = builder.bind().await?;
     let store = create_recv_mem_store();
 
-    let downloaded =
-        download_to_store(ticket, addr, &endpoint, store.as_ref(), &app_handle).await?;
+    // Browsers cap concurrent streams per connection, and the wasm build has
+    // no parallel path; always sequential here.
+    let downloaded = download_to_store(
+        ticket,
+        addr,
+        &endpoint,
+        store.as_ref(),
+        &app_handle,
+        SplitStrategy::None,
+        None,
+    )
+    .await?;
 
     let files = export_collection_bytes(store.as_ref(), downloaded.collection).await?;
 
