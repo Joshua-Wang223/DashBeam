@@ -402,6 +402,8 @@ pub async fn fetch_ticket_metadata(
         discovery_mode,
         magic_ipv4_addr: None,
         magic_ipv6_addr: None,
+        split_strategy: Default::default(),
+        max_concurrency: None,
     };
 
     match fetch_metadata(ticket, options).await {
@@ -454,6 +456,8 @@ pub async fn receive_file(
     sub_folder: Option<String>,
     relay: Option<RelayConfigArg>,
     discovery: Option<DiscoveryConfigArg>,
+    split_strategy: Option<String>,
+    max_concurrency: Option<usize>,
     state: State<'_, AppStateMutex>,
     history: State<'_, Arc<TransferHistoryStore>>,
     app_handle: tauri::AppHandle,
@@ -491,12 +495,21 @@ pub async fn receive_file(
         resolve_receive_output_dir(&app_handle, output_path, sanitized_sub_folder.as_deref())?;
     let (relay_mode, fell_back_to_public) = resolve_relay_mode_with_fallback(relay).await?;
     let discovery_mode = build_discovery_mode(discovery)?;
+
+    // Parse split strategy from string
+    let split_strategy = match split_strategy.as_deref() {
+        Some("split") => engine::SplitStrategy::Split,
+        _ => engine::SplitStrategy::None,
+    };
+
     let options = ReceiveOptions {
         output_dir: Some(output_dir.clone()),
         relay_mode,
         discovery_mode,
         magic_ipv4_addr: None,
         magic_ipv6_addr: None,
+        split_strategy,
+        max_concurrency,
     };
 
     // If a previous cancel left a partial store for a *different* hash, delete it now.

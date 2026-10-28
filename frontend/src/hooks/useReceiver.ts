@@ -107,6 +107,14 @@ export interface UseReceiverReturn {
 	isExportPending: boolean
 	fileNames: string[]
 
+	// Parallel download options
+	splitStrategy: 'none' | 'split'
+	setSplitStrategy: (strategy: 'none' | 'split') => void
+	maxConcurrency: number
+	setMaxConcurrency: (concurrency: number) => void
+	showAdvancedOptions: boolean
+	setShowAdvancedOptions: (show: boolean) => void
+
 	handleTicketChange: (ticket: string) => void
 	handleBrowseFolder: () => Promise<void>
 	handleReceive: () => Promise<void>
@@ -122,6 +130,10 @@ export function useReceiver(): UseReceiverReturn {
 	const [isReceiving, setIsReceiving] = useState(false)
 	const [isTransporting, setIsTransporting] = useState(false)
 	const [isCompleted, setIsCompleted] = useState(false)
+	/** Parallel download configuration */
+	const [splitStrategy, setSplitStrategy] = useState<'none' | 'split'>('none')
+	const [maxConcurrency, setMaxConcurrency] = useState(16)
+	const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
 	/**
 	 * Android is still copying the received files out of app-private staging.
 	 * The success screen goes up on `receive-completed`, which fires before that
@@ -682,6 +694,8 @@ export function useReceiver(): UseReceiverReturn {
 					subFolder: subFolder?.trim() || null,
 					relay: getRelayConfigArg(),
 					discovery: getDiscoveryConfigArg(),
+					splitStrategy,
+					maxConcurrency,
 				})
 			} catch (error) {
 				// A receive that never finished never exports, so nothing is
@@ -710,7 +724,7 @@ export function useReceiver(): UseReceiverReturn {
 				setIsCompleted(false)
 			}
 		},
-		[previewMetadata, showAlert, t]
+		[previewMetadata, showAlert, t, splitStrategy, maxConcurrency]
 	)
 
 	const handleReceive = async () => {
@@ -895,6 +909,14 @@ export function useReceiver(): UseReceiverReturn {
 		isPreviewLoading,
 		isExportPending,
 		fileNames,
+
+		// Parallel download options
+		splitStrategy,
+		setSplitStrategy,
+		maxConcurrency,
+		setMaxConcurrency,
+		showAdvancedOptions,
+		setShowAdvancedOptions,
 
 		handleTicketChange,
 		handleBrowseFolder,

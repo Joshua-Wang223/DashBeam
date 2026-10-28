@@ -20,7 +20,8 @@ pub mod types;
 pub use protocol::{
     apply_options, build_discovery_mode, fetch_metadata, get_or_create_secret, verify_discovery,
     AddrInfoOptions, AppHandle, DiscoveryConfigArg, DiscoveryModeOption, EventEmitter, FileMetadata,
-    FilePreviewItem, ReceiveOptions, RelayModeOption, SendOptions, VerifyDiscoveryResponse,
+    FilePreviewItem, ReceiveOptions, RelayModeOption, SendOptions, SplitStrategy,
+    VerifyDiscoveryResponse,
 };
 pub use device_identity::{
     load_or_create_identity, DeviceIdentity, DeviceInfo, PairedDeviceInfo, PairedDeviceStore,

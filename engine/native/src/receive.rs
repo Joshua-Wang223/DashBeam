@@ -76,7 +76,8 @@ pub async fn download(
 
     let transfer = async {
         let downloaded =
-            download_to_store(ticket, addr, &endpoint, db.as_ref(), &app_handle).await?;
+            download_to_store(ticket, addr, &endpoint, db.as_ref(), &app_handle,
+                options.split_strategy, options.max_concurrency).await?;
 
         let export_start = std::time::Instant::now();
         let conflicts = export_to_directory(&db, downloaded.collection, &output_dir).await?;
@@ -190,6 +191,8 @@ mod tests {
             discovery_mode: Default::default(),
             magic_ipv4_addr: None,
             magic_ipv6_addr: None,
+            split_strategy: protocol::SplitStrategy::default(),
+            max_concurrency: None,
         };
 
         let fetched = protocol::fetch_metadata(result.ticket, recv_opts)
