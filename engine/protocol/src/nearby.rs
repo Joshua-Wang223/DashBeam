@@ -120,6 +120,7 @@ mod tests {
             response: crate::control::InviteResponse::Declined,
         }));
         assert!(unpaired_message_allowed(&ControlMessage::PairRequest {
+            session_id: String::new(),
             sender_name: "Alice".to_string(),
             device_type: "laptop".to_string(),
             os: "macos".to_string(),

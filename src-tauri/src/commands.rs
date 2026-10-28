@@ -458,6 +458,8 @@ pub async fn receive_file(
     discovery: Option<DiscoveryConfigArg>,
     split_strategy: Option<String>,
     max_concurrency: Option<usize>,
+    peer_endpoint_id: Option<String>,
+    pair_prompt_allowed: Option<bool>,
     state: State<'_, AppStateMutex>,
     history: State<'_, Arc<TransferHistoryStore>>,
     app_handle: tauri::AppHandle,
@@ -643,6 +645,22 @@ pub async fn receive_file(
             {
                 let _ = (tree_uri, tree_display_path);
             }
+
+            // Offer to pair with an unpaired sender now that the transfer
+            // succeeded. The persistent peer id is only known when the
+            // transfer came from an invite; a pasted ticket names the
+            // ephemeral share endpoint, which has no control identity.
+            #[cfg(any(desktop, target_os = "android"))]
+            {
+                prompt_pair_after_receive(
+                    &state,
+                    &app_handle,
+                    peer_endpoint_id,
+                    pair_prompt_allowed.unwrap_or(true),
+                )
+                .await;
+            }
+
             Ok(r.message)
         }
         Err(e) if e.to_string() == "cancelled" => {
@@ -1749,58 +1767,115 @@ pub async fn respond_paired_invite(
     Ok(())
 }
 
-/// Check if a device is already paired, and if not, prompt the user to pair.
-/// This is called after a successful transfer with an unpaired peer.
+/// Offer to pair with the sender of a completed transfer when it is not a
+/// paired device yet.
+///
+/// The persistent control identity is only known when the transfer came from
+/// an invite (`peer_endpoint_id`); a pasted ticket names the ephemeral share
+/// endpoint, which does not speak the control protocol and cannot be paired.
+/// The probe runs in the background so it never delays the receive command.
 #[cfg(any(desktop, target_os = "android"))]
-#[tauri::command]
-pub async fn check_and_prompt_pair_after_transfer(
-    endpoint_id: String,
-    display_name: Option<String>,
-    device_type: Option<String>,
-    state: State<'_, AppStateMutex>,
-    app_handle: tauri::AppHandle,
-) -> Result<bool, String> {
-    let node = {
-        let guard = state.lock().await;
-        require_node_arc(&guard)?
-    };
+async fn prompt_pair_after_receive(
+    state: &State<'_, AppStateMutex>,
+    app_handle: &tauri::AppHandle,
+    peer_endpoint_id: Option<String>,
+    allowed: bool,
+) {
+    use iroh::EndpointId;
+    use std::str::FromStr;
 
-    // Check if already paired
-    let paired = node.list_paired().ok().and_then(|devices| {
-        devices.into_iter().find(|d| d.endpoint_id.eq_ignore_ascii_case(&endpoint_id))
-    });
-
-    if paired.is_some() {
-        return Ok(false); // Already paired, no prompt needed
+    if !allowed {
+        return;
     }
+    let Some(peer_endpoint_id) = peer_endpoint_id else {
+        return;
+    };
+    let Ok(peer) = EndpointId::from_str(&peer_endpoint_id) else {
+        return;
+    };
+    let Some(node) = app_state_node(state).await else {
+        return;
+    };
+    let handle = app_handle.clone();
 
-    // Not paired - emit event for frontend to show prompt
-    let payload = serde_json::json!({
-        "endpoint_id": endpoint_id,
-        "display_name": display_name.unwrap_or_else(|| "Unknown Device".to_string()),
-        "device_type": device_type.unwrap_or_else(|| "Unknown".to_string()),
+    tauri::async_runtime::spawn(async move {
+        let endpoint_id = peer.to_string();
+        let already_paired = node
+            .list_paired()
+            .map(|devices| {
+                devices
+                    .iter()
+                    .any(|d| d.endpoint_id.eq_ignore_ascii_case(&endpoint_id))
+            })
+            .unwrap_or(false);
+        if already_paired {
+            return;
+        }
+        // The sender's `InviteResponse` is an inbound unpaired control
+        // connection. Under PairedOnly/Off it would be rejected after the user
+        // approved, leaving a dead-end prompt; do not offer pairing at all.
+        if node.discoverability().await != Discoverability::Everyone {
+            return;
+        }
+
+        // A successful identity probe also proves the sender accepts an
+        // unpaired control connection from this device. If it does not, a
+        // PairRequest would be rejected too, so do not offer a dead-end prompt.
+        let Ok(identity) = node.probe_identity_at(iroh::EndpointAddr::from(peer)).await else {
+            return;
+        };
+        if !identity.endpoint_id.eq_ignore_ascii_case(&endpoint_id) {
+            return;
+        }
+
+        let payload = serde_json::json!({
+            "endpoint_id": endpoint_id,
+            "display_name": identity.display_name,
+            "device_type": identity.device_type,
+            "os": identity.os,
+        });
+        if let Err(error) = handle.emit("pair-prompt-after-transfer", payload) {
+            tracing::warn!(%error, "failed to emit pair-prompt-after-transfer");
+        }
     });
-
-    app_handle.emit("pair-prompt-after-transfer", payload).map_err(|e| e.to_string())?;
-
-    Ok(true) // Prompt shown
 }
 
-/// Pair a device after user accepts the prompt
+/// Request mutual pairing with the sender of a completed transfer.
+///
+/// This is the only path that adds a device from receive history, and it runs
+/// strictly on an explicit user action. It delivers a `PairRequest`; the
+/// sender's user approves on their side, and the arriving
+/// `InviteResponse::Accepted` commits the pairing here. No record is written
+/// unless both sides agree, and pairing never grants auto-accept ("trusted").
 #[cfg(any(desktop, target_os = "android"))]
 #[tauri::command]
 pub async fn pair_device_after_transfer(
     endpoint_id: String,
-    display_name: Option<String>,
     state: State<'_, AppStateMutex>,
 ) -> Result<(), String> {
+    use iroh::EndpointId;
+    use std::str::FromStr;
+
+    let peer =
+        EndpointId::from_str(&endpoint_id).map_err(|e| format!("Invalid endpoint id: {e}"))?;
+    let addr = iroh::EndpointAddr::from(peer);
+
     let node = {
         let guard = state.lock().await;
         require_node_arc(&guard)?
     };
 
-    node.pair_device(&endpoint_id, display_name.as_deref())
+    // Probe fresh on accept: the stored record must carry the peer's real
+    // identity, not whatever the prompt event happened to include.
+    let identity = node.peer_identity_at(addr.clone()).await;
+
+    let delivered = node
+        .request_pair_at(addr, identity)
+        .await
         .map_err(|e| e.to_string())?;
+    if !delivered {
+        return Err("Could not reach the sender to request pairing".to_string());
+    }
 
     Ok(())
 }
@@ -1965,6 +2040,30 @@ pub async fn respond_nearby_invite(
         node.decline_nearby_invite(&endpoint_id, block).await
     };
     result.map_err(|e| e.to_string())
+}
+
+/// Accept or decline a post-transfer `PairRequest`.
+///
+/// The session id is the one carried by `nearby-pair-request-received`; it is
+/// echoed in `InviteResponse` so the receiver can reject a stale reply.
+#[cfg(any(desktop, target_os = "android"))]
+#[tauri::command]
+pub async fn respond_pair_request(
+    endpoint_id: String,
+    session_id: String,
+    accept: bool,
+    state: State<'_, AppStateMutex>,
+) -> Result<(), String> {
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+    if accept {
+        node.accept_pair_request(&endpoint_id, &session_id).await
+    } else {
+        node.decline_pair_request(&endpoint_id, &session_id).await
+    }
+    .map_err(|e| e.to_string())
 }
 
 /// Show a desktop notification that stays as long as the OS allows. The Tauri

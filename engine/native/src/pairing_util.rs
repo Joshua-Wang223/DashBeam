@@ -66,12 +66,14 @@ pub fn emit_device_paired(app_handle: &AppHandle, display_name: &str) {
 pub fn emit_nearby_pair_request(
     app_handle: &AppHandle,
     remote_endpoint_id: &str,
+    session_id: &str,
     sender_name: &str,
     device_type: &str,
     os: &str,
 ) {
     let payload = serde_json::json!({
         "remote_endpoint_id": remote_endpoint_id,
+        "session_id": session_id,
         "sender_name": sender_name,
         "device_type": device_type,
         "os": os,
