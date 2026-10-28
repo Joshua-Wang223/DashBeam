@@ -26,6 +26,7 @@ export const defaultAppSettings: AppSettingsState = {
 	discoverability: 'everyone',
 	autostartInitialized: false,
 	enableTransferHistory: true,
+	dismissedPairPrompts: [],
 }
 
 const webSettingStorage: StateStorage = {

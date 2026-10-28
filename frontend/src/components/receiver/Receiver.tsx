@@ -1,9 +1,10 @@
-import { Info } from 'lucide-react'
+import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useReceiverContext } from './ReceiverProvider'
 import { useTranslation } from '../../i18n/react-i18next-compat'
+import { IS_WEB } from '../../lib/platform'
 import { PulseAnimation } from '../common/PulseAnimation'
 import { TransferSuccessScreen } from '../common/TransferSuccessScreen'
+import { Button } from '../ui/button'
 import {
 	Dialog,
 	DialogClose,
@@ -13,13 +14,18 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '../ui/dialog'
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '../ui/select'
+import { Slider } from '../ui/slider'
+import { useReceiverContext } from './ReceiverProvider'
+import { ReceiveSaveLocationPicker } from './ReceiveSaveLocationPicker'
 import { ReceivingActiveCard } from './ReceivingActiveCard'
 import { TicketInput } from './TicketInput'
-import { ReceiveSaveLocationPicker } from './ReceiveSaveLocationPicker'
-import { Button } from '../ui/button'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { Slider } from '../ui/slider'
 
 interface ReceiverProps {
 	onTransferStateChange: (isReceiving: boolean) => void
@@ -99,78 +105,92 @@ export function Receiver({ onTransferStateChange }: ReceiverProps) {
 							onReceive={handleReceive}
 						/>
 
-						<div className="mt-2">
-							<button
-								type="button"
-								className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary"
-								onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-							>
-								{showAdvancedOptions ? (
-									<ChevronUp className="h-4 w-4" />
-								) : (
-									<ChevronDown className="h-4 w-4" />
-								)}
-								{t('common:receiver.advancedDownloadOptions')}
-							</button>
+						{/* The web build always downloads sequentially (browser stream
+						    limits), so there is nothing to configure there. */}
+						{!IS_WEB && (
+							<div className="mt-2">
+								<button
+									type="button"
+									className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary"
+									onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+								>
+									{showAdvancedOptions ? (
+										<ChevronUp className="h-4 w-4" />
+									) : (
+										<ChevronDown className="h-4 w-4" />
+									)}
+									{t('common:receiver.advancedDownloadOptions')}
+								</button>
 
-							{showAdvancedOptions && (
-								<div className="mt-3 space-y-4 p-4 border rounded-md bg-muted/20">
-									<div className="space-y-2">
-										<label className="text-sm font-medium">
-											{t('common:receiver.downloadStrategy')}
-										</label>
-										<Select
-											value={splitStrategy}
-											onValueChange={(value) => setSplitStrategy(value as 'none' | 'split')}
-											disabled={isReceiving}
-										>
-											<SelectTrigger>
-												<SelectValue placeholder={t('common:receiver.selectStrategy')} />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="none">
-													{t('common:receiver.strategySequential')}
-												</SelectItem>
-												<SelectItem value="split">
-													{t('common:receiver.strategyParallel')}
-												</SelectItem>
-											</SelectContent>
-										</Select>
-										<p className="text-xs text-muted-foreground">
-											{splitStrategy === 'split'
-												? t('common:receiver.strategyParallelDesc')
-												: t('common:receiver.strategySequentialDesc')}
-										</p>
-									</div>
-
-									{splitStrategy === 'split' && (
+								{showAdvancedOptions && (
+									<div className="mt-3 space-y-4 p-4 border rounded-md bg-muted/20">
 										<div className="space-y-2">
-											<div className="flex justify-between">
-												<label className="text-sm font-medium">
-													{t('common:receiver.maxConcurrency', {
-														value: maxConcurrency,
-													})}
-												</label>
-												<span className="text-sm text-muted-foreground">
-													{maxConcurrency}
-												</span>
-											</div>
-											<Slider
-												value={[maxConcurrency]}
-												onValueChange={(vals) => setMaxConcurrency(Array.isArray(vals) ? vals[0] : vals)}
-												min={1}
-												max={32}
-												step={1}
+											<span className="text-sm font-medium">
+												{t('common:receiver.downloadStrategy')}
+											</span>
+											<Select
+												value={splitStrategy}
+												onValueChange={(value) =>
+													setSplitStrategy(value as 'none' | 'split')
+												}
 												disabled={isReceiving}
-											/>
+											>
+												<SelectTrigger
+													aria-label={t('common:receiver.downloadStrategy')}
+												>
+													<SelectValue
+														placeholder={t('common:receiver.selectStrategy')}
+													/>
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="none">
+														{t('common:receiver.strategySequential')}
+													</SelectItem>
+													<SelectItem value="split">
+														{t('common:receiver.strategyParallel')}
+													</SelectItem>
+												</SelectContent>
+											</Select>
 											<p className="text-xs text-muted-foreground">
-												{t('common:receiver.maxConcurrencyDesc')}
+												{splitStrategy === 'split'
+													? t('common:receiver.strategyParallelDesc')
+													: t('common:receiver.strategySequentialDesc')}
 											</p>
 										</div>
-									)}
-								</div>
-							)}
-						</div>
+
+										{splitStrategy === 'split' && (
+											<div className="space-y-2">
+												<div className="flex justify-between">
+													<span className="text-sm font-medium">
+														{maxConcurrency === null
+															? t('common:receiver.maxConcurrencyAuto')
+															: t('common:receiver.maxConcurrency', {
+																	value: maxConcurrency,
+																})}
+													</span>
+												</div>
+												<Slider
+													aria-label={t('common:receiver.maxConcurrencyAuto')}
+													value={[maxConcurrency ?? 16]}
+													onValueChange={(vals) =>
+														setMaxConcurrency(
+															Array.isArray(vals) ? vals[0] : vals
+														)
+													}
+													min={2}
+													max={32}
+													step={1}
+													disabled={isReceiving}
+												/>
+												<p className="text-xs text-muted-foreground">
+													{t('common:receiver.maxConcurrencyDesc')}
+												</p>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						)}
 					</div>
 				</>
 			) : isCompleted && transferMetadata ? (
@@ -228,13 +248,13 @@ export function Receiver({ onTransferStateChange }: ReceiverProps) {
 					<DialogHeader>
 						<DialogTitle>{t('common:receiver.howToReceive')}</DialogTitle>
 						<DialogDescription></DialogDescription>
-					<ol className="text-sm space-y-2 list-decimal list-inside mt-2">
-						<li>{t('common:receiver.instruction1')}</li>
-						<li>{t('common:receiver.instruction2')}</li>
-						<li>{t('common:receiver.instruction3')}</li>
-						<li>{t('common:receiver.instruction4')}</li>
-						<li>{t('common:receiver.instruction5')}</li>
-					</ol>
+						<ol className="text-sm space-y-2 list-decimal list-inside mt-2">
+							<li>{t('common:receiver.instruction1')}</li>
+							<li>{t('common:receiver.instruction2')}</li>
+							<li>{t('common:receiver.instruction3')}</li>
+							<li>{t('common:receiver.instruction4')}</li>
+							<li>{t('common:receiver.instruction5')}</li>
+						</ol>
 					</DialogHeader>
 					<DialogFooter>
 						<DialogClose

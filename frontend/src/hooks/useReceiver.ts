@@ -12,6 +12,7 @@ import {
 	supportsWebSaveLocationPicker,
 	type UnlistenFn,
 } from '@/lib/platform-api'
+import { isReceiveSessionBusy } from '@/lib/receive-session'
 import {
 	getWebPreviewErrorMessage,
 	isWebPreviewError,
@@ -22,27 +23,26 @@ import {
 	selectDownloadFolder,
 } from '@/plugins/nativeUtils'
 import { useAppSettingStore } from '@/store/app-setting'
-import { isReceiveSessionBusy } from '@/lib/receive-session'
 import {
-	useReceiverActionsStore,
 	type AcceptPairedInviteOptions,
+	useReceiverActionsStore,
 } from '@/store/receiver-actions-store'
 import { useTransferTabStore } from '@/store/transfer-tab-store'
 import { useTranslation } from '../i18n/react-i18next-compat'
-import { getRelayConfigArg } from '../lib/relay'
 import { getDiscoveryConfigArg } from '../lib/discovery'
 import { ticketFromReceiveLink } from '../lib/receive-link'
+import { getRelayConfigArg } from '../lib/relay'
 import { sendSystemNotification } from '../lib/systemNotification'
+import {
+	parseCompletionPayload,
+	parseProgressPayload,
+} from '../lib/transfer-events'
 import type {
 	TicketPreviewMetadata,
 	TransferMetadata,
 	TransferProgress,
 } from '../types/transfer'
 import type { AlertDialogState, AlertType } from '../types/ui'
-import {
-	parseCompletionPayload,
-	parseProgressPayload,
-} from '../lib/transfer-events'
 
 interface BackendFileMetadata {
 	file_name: string
@@ -110,10 +110,19 @@ export interface UseReceiverReturn {
 	// Parallel download options
 	splitStrategy: 'none' | 'split'
 	setSplitStrategy: (strategy: 'none' | 'split') => void
-	maxConcurrency: number
+	/** `null` lets the backend pick by transfer size. */
+	maxConcurrency: number | null
 	setMaxConcurrency: (concurrency: number) => void
 	showAdvancedOptions: boolean
 	setShowAdvancedOptions: (show: boolean) => void
+
+	/** Unpaired sender from the last successful transfer, if any. */
+	pairPrompt: {
+		endpointId: string
+		displayName: string
+	} | null
+	acceptPairPrompt: () => Promise<boolean>
+	dismissPairPrompt: () => void
 
 	handleTicketChange: (ticket: string) => void
 	handleBrowseFolder: () => Promise<void>
@@ -132,8 +141,15 @@ export function useReceiver(): UseReceiverReturn {
 	const [isCompleted, setIsCompleted] = useState(false)
 	/** Parallel download configuration */
 	const [splitStrategy, setSplitStrategy] = useState<'none' | 'split'>('none')
-	const [maxConcurrency, setMaxConcurrency] = useState(16)
+	// `null` means "let the backend pick by transfer size" (4/16/32); the
+	// slider only sends an override once the user moves it.
+	const [maxConcurrency, setMaxConcurrency] = useState<number | null>(null)
 	const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
+	/** Sender offered for pairing after a successful transfer (user decides). */
+	const [pairPrompt, setPairPrompt] = useState<{
+		endpointId: string
+		displayName: string
+	} | null>(null)
 	/**
 	 * Android is still copying the received files out of app-private staging.
 	 * The success screen goes up on `receive-completed`, which fires before that
@@ -588,6 +604,34 @@ export function useReceiver(): UseReceiverReturn {
 					body: displayName,
 				})
 			})
+
+			// The backend offers pairing only after a successful receive with an
+			// unpaired sender; nothing is paired until the user accepts and the
+			// sender approves on their side.
+			await registerListener('pair-prompt-after-transfer', (event: any) => {
+				try {
+					const payload =
+						typeof event?.payload === 'string'
+							? JSON.parse(event.payload)
+							: event?.payload
+					const endpointId = String(payload?.endpoint_id ?? '').trim()
+					if (!endpointId) return
+
+					// Read imperatively: the listener is registered once, so a
+					// captured value would be stale after a dismissal.
+					const dismissed =
+						useAppSettingStore.getState().dismissedPairPrompts ?? []
+					if (dismissed.includes(endpointId)) return
+
+					const rawName = String(payload?.display_name ?? '').trim()
+					setPairPrompt({
+						endpointId,
+						displayName: rawName || t('common:receiver.unknownDevice'),
+					})
+				} catch (error) {
+					console.error('Failed to parse pair prompt event:', error)
+				}
+			})
 		}
 
 		setupListeners().catch((error) => {
@@ -646,7 +690,11 @@ export function useReceiver(): UseReceiverReturn {
 	}, [isReceiving, setDownloadsPath, setDownloadsUri, showAlert, t])
 
 	const receiveWithTicket = useCallback(
-		async (ticketValue: string, subFolder?: string | null) => {
+		async (
+			ticketValue: string,
+			subFolder?: string | null,
+			peerEndpointId?: string | null
+		) => {
 			if (!ticketValue.trim()) return
 
 			try {
@@ -663,6 +711,9 @@ export function useReceiver(): UseReceiverReturn {
 				setTransferProgress(null)
 				setTransferStartTime(null)
 				setIsPreviewLoading(false)
+				// A prompt left over from the previous transfer would point at
+				// the wrong sender.
+				setPairPrompt(null)
 				pendingConflictNoticeRef.current = null
 				folderOpenTriggeredRef.current = false
 				completedOutputDirRef.current = ''
@@ -696,6 +747,12 @@ export function useReceiver(): UseReceiverReturn {
 					discovery: getDiscoveryConfigArg(),
 					splitStrategy,
 					maxConcurrency,
+					peerEndpointId: peerEndpointId ?? null,
+					pairPromptAllowed: peerEndpointId
+						? !(
+								useAppSettingStore.getState().dismissedPairPrompts ?? []
+							).includes(peerEndpointId)
+						: false,
 				})
 			} catch (error) {
 				// A receive that never finished never exports, so nothing is
@@ -730,6 +787,45 @@ export function useReceiver(): UseReceiverReturn {
 	const handleReceive = async () => {
 		await receiveWithTicket(ticket)
 	}
+
+	/**
+	 * Sends a mutual pairing request. Nothing is stored locally here: the
+	 * sender's user approves on their device, and the resulting
+	 * `InviteResponse::Accepted` commits the pairing on both sides (without
+	 * granting auto-accept). On failure the prompt stays open so the user can
+	 * retry instead of having to wait for another transfer.
+	 */
+	const acceptPairPrompt = useCallback(async (): Promise<boolean> => {
+		if (!pairPrompt) return false
+		try {
+			await invoke('pair_device_after_transfer', {
+				endpointId: pairPrompt.endpointId,
+			})
+			useAppSettingStore
+				.getState()
+				.clearDismissedPairPrompt(pairPrompt.endpointId)
+			setPairPrompt(null)
+			showAlert(
+				t('common:receiver.pairRequestSentTitle'),
+				t('common:receiver.pairRequestSent'),
+				'info'
+			)
+			return true
+		} catch (error) {
+			console.error('Failed to request pairing:', error)
+			showAlert(t('common:receiver.pairFailed'), String(error), 'error')
+			return false
+		}
+	}, [pairPrompt, showAlert, t])
+
+	const dismissPairPrompt = useCallback(() => {
+		if (pairPrompt) {
+			useAppSettingStore
+				.getState()
+				.rememberDismissedPairPrompt(pairPrompt.endpointId)
+		}
+		setPairPrompt(null)
+	}, [pairPrompt])
 
 	// `isReceiving` stays true after a transfer finishes so the success screen
 	// survives until the user clicks Done — see `isReceiveSessionBusy`. Reading
@@ -771,7 +867,11 @@ export function useReceiver(): UseReceiverReturn {
 			previewRequestSeqRef.current += 1
 			setIsPreviewLoading(false)
 
-			await receiveWithTicket(invite.blob_ticket, options?.subFolder ?? null)
+			await receiveWithTicket(
+				invite.blob_ticket,
+				options?.subFolder ?? null,
+				invite.remote_endpoint_id
+			)
 		},
 		[isSessionBusy, receiveWithTicket, showAlert, t]
 	)
@@ -832,6 +932,7 @@ export function useReceiver(): UseReceiverReturn {
 		androidMediaStorePathRef.current = ''
 		setIsExportPending(false)
 		transferItemCountRef.current = undefined
+		setPairPrompt(null)
 	}
 
 	const handleOpenFolder = async () => {
@@ -917,6 +1018,11 @@ export function useReceiver(): UseReceiverReturn {
 		setMaxConcurrency,
 		showAdvancedOptions,
 		setShowAdvancedOptions,
+
+		// Post-transfer pairing prompt
+		pairPrompt,
+		acceptPairPrompt,
+		dismissPairPrompt,
 
 		handleTicketChange,
 		handleBrowseFolder,
