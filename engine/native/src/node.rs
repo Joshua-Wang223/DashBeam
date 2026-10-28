@@ -27,6 +27,7 @@ use tracing::debug;
 use crate::device_identity::{
     load_or_create_identity, DeviceIdentity, DeviceInfo, PairedDeviceInfo, PairedDeviceStore,
 };
+use protocol::{detect_os, normalize_display_name};
 use crate::lan_discovery::{LanDiscovery, LanEvent};
 use crate::nearby::{NearbyDevice, NearbyRegistry, ObserveOutcome};
 use crate::paired_connections::{invite_wait_timeout, PairedConnectionManager};
@@ -1168,6 +1169,49 @@ impl NodeService {
         }
 
         Ok(())
+    }
+
+    /// Add a device to the paired store (called after user accepts pairing prompt).
+    pub fn pair_device(&self, endpoint_id: &str, display_name: Option<&str>) -> anyhow::Result<PairedDevice> {
+        let now = protocol::identity::unix_now_ms();
+        let device = PairedDevice {
+            endpoint_id: endpoint_id.to_string(),
+            display_name: display_name
+                .map(normalize_display_name)
+                .transpose()
+                .map_err(anyhow::Error::msg)?
+                .unwrap_or_else(|| "Unknown Device".to_string()),
+            device_type: "Unknown".to_string(),
+            os: detect_os().to_string(),
+            paired_at: now,
+            last_seen_at: now,
+            relay_url: None,
+            pairing_status: PairingStatus::Active,
+            trusted: true,
+        };
+
+        self.paired_store.remember(device.clone())?;
+
+        // Update presence
+        set_presence(
+            &self.presence,
+            &self.app_handle,
+            &self.paired_store,
+            endpoint_id,
+            true,
+        );
+
+        // Emit event for UI
+        if let Some(handle) = &self.app_handle {
+            let payload = serde_json::json!({
+                "endpoint_id": endpoint_id,
+                "display_name": device.display_name,
+                "device_type": device.device_type,
+            });
+            let _ = handle.emit_event_with_payload("device-paired", &payload.to_string());
+        }
+
+        Ok(device)
     }
 
     /// Immediate pairing code from local identity. Never waits on presence or

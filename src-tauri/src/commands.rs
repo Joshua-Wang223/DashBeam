@@ -1749,6 +1749,63 @@ pub async fn respond_paired_invite(
     Ok(())
 }
 
+/// Check if a device is already paired, and if not, prompt the user to pair.
+/// This is called after a successful transfer with an unpaired peer.
+#[cfg(any(desktop, target_os = "android"))]
+#[tauri::command]
+pub async fn check_and_prompt_pair_after_transfer(
+    endpoint_id: String,
+    display_name: Option<String>,
+    device_type: Option<String>,
+    state: State<'_, AppStateMutex>,
+    app_handle: tauri::AppHandle,
+) -> Result<bool, String> {
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+
+    // Check if already paired
+    let paired = node.list_paired().ok().and_then(|devices| {
+        devices.into_iter().find(|d| d.endpoint_id.eq_ignore_ascii_case(&endpoint_id))
+    });
+
+    if paired.is_some() {
+        return Ok(false); // Already paired, no prompt needed
+    }
+
+    // Not paired - emit event for frontend to show prompt
+    let payload = serde_json::json!({
+        "endpoint_id": endpoint_id,
+        "display_name": display_name.unwrap_or_else(|| "Unknown Device".to_string()),
+        "device_type": device_type.unwrap_or_else(|| "Unknown".to_string()),
+    });
+
+    app_handle.emit("pair-prompt-after-transfer", payload).map_err(|e| e.to_string())?;
+
+    Ok(true) // Prompt shown
+}
+
+/// Pair a device after user accepts the prompt
+#[cfg(any(desktop, target_os = "android"))]
+#[tauri::command]
+pub async fn pair_device_after_transfer(
+    endpoint_id: String,
+    display_name: Option<String>,
+    state: State<'_, AppStateMutex>,
+) -> Result<(), String> {
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+
+    node.pair_device(&endpoint_id, display_name.as_deref())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 #[cfg(any(desktop, target_os = "android"))]
 #[tauri::command]
 pub async fn list_nearby(state: State<'_, AppStateMutex>) -> Result<Vec<NearbyDevice>, String> {
