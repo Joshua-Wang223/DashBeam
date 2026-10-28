@@ -212,6 +212,10 @@ pub fn run() {
             #[cfg(any(desktop, target_os = "android"))]
             respond_paired_invite,
             #[cfg(any(desktop, target_os = "android"))]
+            check_and_prompt_pair_after_transfer,
+            #[cfg(any(desktop, target_os = "android"))]
+            pair_device_after_transfer,
+            #[cfg(any(desktop, target_os = "android"))]
             list_nearby,
             #[cfg(any(desktop, target_os = "android"))]
             nearby_status,

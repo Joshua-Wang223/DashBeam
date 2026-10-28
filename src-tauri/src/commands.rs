@@ -1800,7 +1800,6 @@ pub async fn pair_device_after_transfer(
     };
 
     node.pair_device(&endpoint_id, display_name.as_deref())
-        .await
         .map_err(|e| e.to_string())?;
 
     Ok(())
