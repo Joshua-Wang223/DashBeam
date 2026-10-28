@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listen } from '@/lib/platform-api'
-import { IS_PAIRING_CAPABLE } from '@/lib/platform'
 import {
+	type DeviceUnpairedPayload,
 	forgetPairedDevice,
 	joinPairing,
 	renamePairedDevice,
@@ -9,16 +8,18 @@ import {
 	startPairingHost,
 	stopPairingHost,
 	trustPairedDevice,
-	type DeviceUnpairedPayload,
 } from '@/lib/pairing-api'
-import { useTranslation } from '../i18n/react-i18next-compat'
+import { IS_PAIRING_CAPABLE } from '@/lib/platform'
+import { listen } from '@/lib/platform-api'
+import { useAppSettingStore } from '@/store/app-setting'
+import { usePairingDataStore } from '@/store/pairing-data-store'
 import { toastManager } from '../components/ui/toast'
+import { useTranslation } from '../i18n/react-i18next-compat'
 import { useNodeCapability } from './useNodeCapability'
 import {
 	applyPresencePatch,
 	usePairedDeviceEvents,
 } from './usePairedDeviceEvents'
-import { usePairingDataStore } from '@/store/pairing-data-store'
 
 const PAIRING_HOST_TTL_SECS = 180
 
@@ -191,6 +192,8 @@ export function usePairing() {
 	const forget = useCallback(
 		async (endpointId: string) => {
 			await forgetPairedDevice(endpointId)
+			// Forget means "we may be asked to pair again", not "never prompt".
+			useAppSettingStore.getState().clearDismissedPairPrompt(endpointId)
 			await hydrate()
 		},
 		[hydrate]

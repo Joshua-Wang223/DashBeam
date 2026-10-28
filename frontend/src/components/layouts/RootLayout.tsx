@@ -1,19 +1,6 @@
 import { Outlet } from 'react-router-dom'
-
-import { AppFooter } from '../AppFooter'
-import { TitleBar } from '../TitleBar'
-import { useTranslation } from '@/i18n'
-import { AppUpdater } from '../common/AppUpdater'
-import { DeviceNodeSync } from '../pairing/DeviceNodeSync'
-import { NearbyInviteDialog } from '../pairing/NearbyInviteDialog'
-import { NearbyPairRequestDialog } from '../pairing/NearbyPairRequestDialog'
-import { NearbyVerificationDialog } from '../pairing/NearbyVerificationDialog'
-import { PairedInviteDialog } from '../pairing/PairedInviteDialog'
-import { ReceiverProvider } from '../receiver/ReceiverProvider'
-import { WindowsContextMenuSync } from '../settings/system-tray/context-menu-toggle'
 import { useIsWindowsPortable } from '@/hooks/use-windows-portable'
-import { useAutostartFirstRun } from '../../hooks/useAutostartFirstRun'
-import { useTrayLabels } from '../../hooks/useTrayLabels'
+import { useTranslation } from '@/i18n'
 import {
 	IS_ANDROID,
 	IS_LINUX,
@@ -23,6 +10,19 @@ import {
 	IS_WEB,
 	IS_WINDOWS,
 } from '@/lib/platform'
+import { useAutostartFirstRun } from '../../hooks/useAutostartFirstRun'
+import { useTrayLabels } from '../../hooks/useTrayLabels'
+import { AppFooter } from '../AppFooter'
+import { AppUpdater } from '../common/AppUpdater'
+import { DeviceNodeSync } from '../pairing/DeviceNodeSync'
+import { NearbyInviteDialog } from '../pairing/NearbyInviteDialog'
+import { NearbyPairRequestDialog } from '../pairing/NearbyPairRequestDialog'
+import { NearbyVerificationDialog } from '../pairing/NearbyVerificationDialog'
+import { PairedInviteDialog } from '../pairing/PairedInviteDialog'
+import { PairPromptDialog } from '../receiver/PairPromptDialog'
+import { ReceiverProvider } from '../receiver/ReceiverProvider'
+import { WindowsContextMenuSync } from '../settings/system-tray/context-menu-toggle'
+import { TitleBar } from '../TitleBar'
 
 export function RootLayout() {
 	const { t } = useTranslation('common')
@@ -40,6 +40,7 @@ export function RootLayout() {
 			{IS_PAIRING_CAPABLE && <NearbyInviteDialog />}
 			{IS_PAIRING_CAPABLE && <NearbyPairRequestDialog />}
 			{IS_PAIRING_CAPABLE && <NearbyVerificationDialog />}
+			{IS_PAIRING_CAPABLE && <PairPromptDialog />}
 			<main
 				className={
 					IS_WEB
