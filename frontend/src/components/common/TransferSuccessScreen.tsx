@@ -1,8 +1,6 @@
 import { CheckCircle, ExternalLinkIcon, XCircle } from 'lucide-react'
 import { useTranslation } from '../../i18n/react-i18next-compat'
-import { handleExternalLinkClick } from '../../lib/openExternalUrl'
 import { IS_WEB } from '../../lib/platform'
-import { DONATE_LINK } from '../../lib/version'
 import { formatFileSize } from '../../lib/utils'
 import type { SuccessScreenProps } from '../../types/transfer'
 import { Button } from '../ui/button'
@@ -53,10 +51,6 @@ export function TransferSuccessScreen({
 	const wasStopped = metadata.wasStopped || false
 	const isDirectory = metadata.pathType === 'directory'
 	const { t } = useTranslation()
-	const donateLinkText = t('common:transfer.donateLink')
-	const [donatePromptBefore, donatePromptAfter = ''] = t(
-		'common:transfer.donatePrompt'
-	).split('{{link}}')
 
 	return (
 		<div className="flex flex-col items-center justify-center space-y-6 ">
@@ -187,22 +181,6 @@ export function TransferSuccessScreen({
 					{t('common:transfer.done')}
 				</Button>
 			)}
-
-			{!wasStopped ? (
-				<p className="text-center text-xs sm:text-sm text-muted-foreground">
-					{donatePromptBefore}
-					<a
-						href={DONATE_LINK}
-						onClick={(event) => handleExternalLinkClick(event, DONATE_LINK)}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="font-medium text-foreground/70 underline decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary/60"
-					>
-						{donateLinkText}
-					</a>
-					{donatePromptAfter}
-				</p>
-			) : null}
 		</div>
 	)
 }

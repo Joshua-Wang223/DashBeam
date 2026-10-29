@@ -192,6 +192,8 @@
 		"progress": "স্থানান্তরের অগ্রগতি",
 		"speed": "গতি",
 		"eta": "ETA",
+		"chunks": "খণ্ড ({{size}})",
+		"concurrency": "সমবর্তন",
 		"timeRemaining": "বাকি সময়",
 		"calculating": "গণনা করা হচ্ছে...",
 		"complete": "স্থানান্তর সম্পন্ন হয়েছে!",
@@ -210,9 +212,7 @@
 		"downloadPath": "ডাউনলোডের অবস্থান",
 		"duration": "সময়কাল",
 		"avgSpeed": "গড় গতি",
-		"multipleFiles": "{{count}}টি ফাইল",
-		"donatePrompt": "অভিজ্ঞতাটি ভালো লেগে থাকলে অনুগ্রহ করে {{link}}-এর কথা ভাবুন। ধন্যবাদ!",
-		"donateLink": "অনুদান দেওয়া"
+		"multipleFiles": "{{count}}টি ফাইল"
 	},
 	"errors": {
 		"sharingFailed": "শেয়ার ব্যর্থ হয়েছে",

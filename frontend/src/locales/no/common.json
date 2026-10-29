@@ -192,6 +192,8 @@
 		"progress": "Status",
 		"speed": "Hastighet",
 		"eta": "ETA",
+		"chunks": "Biter ({{size}})",
+		"concurrency": "Samtidighet",
 		"timeRemaining": "Tid igjen",
 		"calculating": "Beregner...",
 		"complete": "Overføring fullført!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Nedlastingssted",
 		"duration": "Varighet",
 		"avgSpeed": "Gjennomsnittlig hastighet",
-		"multipleFiles": "{{count}} filer",
-		"donatePrompt": "Hvis du likte opplevelsen, vurder gjerne å {{link}}. Takk!",
-		"donateLink": "donere"
+		"multipleFiles": "{{count}} filer"
 	},
 	"errors": {
 		"sharingFailed": "Deling feilet",

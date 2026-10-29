@@ -192,6 +192,8 @@
 		"progress": "Прогрес передачі",
 		"speed": "Швидкість",
 		"eta": "ETA",
+		"chunks": "Блоки ({{size}})",
+		"concurrency": "Паралельність",
 		"timeRemaining": "Залишилося часу",
 		"calculating": "Розрахунок...",
 		"complete": "Передача завершена!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Шлях для завантаження",
 		"duration": "Тривалість",
 		"avgSpeed": "Середня швидкість",
-		"multipleFiles": "{{count}} файлів",
-		"donatePrompt": "Якщо вам сподобався досвід, будь ласка, розгляньте {{link}}. Дякуємо!",
-		"donateLink": "пожертву"
+		"multipleFiles": "{{count}} файлів"
 	},
 	"errors": {
 		"sharingFailed": "Помилка передачі",

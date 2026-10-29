@@ -192,6 +192,8 @@
 		"progress": "ความคืบหน้าการส่ง",
 		"speed": "ความเร็ว",
 		"eta": "ETA",
+		"chunks": "บล็อก ({{size}})",
+		"concurrency": "การทำงานพร้อมกัน",
 		"timeRemaining": "เวลาที่เหลือ",
 		"calculating": "กำลังคำนวณ...",
 		"complete": "การส่งเสร็จสมบูรณ์!",
@@ -210,9 +212,7 @@
 		"downloadPath": "เส้นทางดาวน์โหลด",
 		"duration": "ระยะเวลา",
 		"avgSpeed": "ความเร็วเฉลี่ย",
-		"multipleFiles": "{{count}} ไฟล์",
-		"donatePrompt": "หากคุณชอบประสบการณ์นี้ โปรดพิจารณา{{link}} ขอบคุณ!",
-		"donateLink": "บริจาค"
+		"multipleFiles": "{{count}} ไฟล์"
 	},
 	"errors": {
 		"sharingFailed": "การแชร์ล้มเหลว",

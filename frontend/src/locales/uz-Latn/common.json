@@ -192,6 +192,8 @@
 		"progress": "Uzatish jarayoni",
 		"speed": "Tezlik",
 		"eta": "ETA",
+		"chunks": "Bo‘laklar ({{size}})",
+		"concurrency": "Bir vaqtlilik",
 		"timeRemaining": "Qolgan vaqt",
 		"calculating": "Hisoblanmoqda...",
 		"complete": "Uzatish yakunlandi!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Yuklab olish manzili",
 		"duration": "Davomiyligi",
 		"avgSpeed": "O'rtacha tezlik",
-		"multipleFiles": "{{count}} ta fayl",
-		"donatePrompt": "Agar tajriba yoqsa, iltimos {{link}} haqida o‘ylab ko‘ring. Rahmat!",
-		"donateLink": "xayriya qilish"
+		"multipleFiles": "{{count}} ta fayl"
 	},
 	"errors": {
 		"sharingFailed": "Ulashish muvaffaqiyatsiz",

@@ -29,7 +29,8 @@ fn dir_size(path: &std::path::Path) -> u64 {
     total
 }
 
-/// Bytes-so-far from the latest `receive-progress` event (payload is `bytes:total:speed`).
+/// Bytes-so-far from the latest `receive-progress` event (payload is
+/// `bytes:total:speed[:concurrency]`).
 fn latest_progress_bytes(emitter: &MockEventEmitter) -> u64 {
     emitter
         .events_with_name("receive-progress")

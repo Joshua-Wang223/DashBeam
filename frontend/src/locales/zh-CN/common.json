@@ -216,6 +216,8 @@
 		"progress": "传输进度",
 		"speed": "速度",
 		"eta": "预计时间",
+		"chunks": "分块 ({{size}})",
+		"concurrency": "并发",
 		"timeRemaining": "剩余时间",
 		"calculating": "计算中...",
 		"complete": "传输完成！",
@@ -234,9 +236,7 @@
 		"downloadPath": "下载路径",
 		"duration": "持续时间",
 		"avgSpeed": "平均速度",
-		"multipleFiles": "{{count}} 个文件",
-		"donatePrompt": "如果喜欢这次体验，请考虑{{link}}。谢谢！",
-		"donateLink": "捐赠"
+		"multipleFiles": "{{count}} 个文件"
 	},
 	"errors": {
 		"sharingFailed": "共享失败",

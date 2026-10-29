@@ -22,6 +22,8 @@ export interface TransferProgress {
 	fileIndex?: number
 	totalFiles?: number
 	etaSeconds?: number
+	/** Parallel streams the engine reports for this transfer. */
+	concurrency?: number
 }
 
 export interface TicketPreviewMetadata {

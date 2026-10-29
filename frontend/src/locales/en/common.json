@@ -216,6 +216,8 @@
 		"progress": "Transfer Progress",
 		"speed": "Speed",
 		"eta": "ETA",
+		"chunks": "Chunks ({{size}})",
+		"concurrency": "Concurrency",
 		"timeRemaining": "Time Remaining",
 		"calculating": "Calculating...",
 		"complete": "Transfer Complete!",
@@ -234,9 +236,7 @@
 		"downloadPath": "Download path",
 		"duration": "Duration",
 		"avgSpeed": "Avg Speed",
-		"multipleFiles": "{{count}} Files",
-		"donatePrompt": "If you love the experience, please consider {{link}}. Thanks!",
-		"donateLink": "donating"
+		"multipleFiles": "{{count}} Files"
 	},
 	"errors": {
 		"sharingFailed": "Sharing Failed",

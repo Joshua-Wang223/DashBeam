@@ -192,6 +192,8 @@
 		"progress": "Postęp transferu",
 		"speed": "Prędkość",
 		"eta": "ETA",
+		"chunks": "Fragmenty ({{size}})",
+		"concurrency": "Współbieżność",
 		"timeRemaining": "Pozostały czas",
 		"calculating": "Obliczanie...",
 		"complete": "Transfer zakończony!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Ścieżka pobierania",
 		"duration": "Czas trwania",
 		"avgSpeed": "Średnia prędkość",
-		"multipleFiles": "{{count}} plików",
-		"donatePrompt": "Jeśli podoba Ci się to doświadczenie, rozważ proszę {{link}}. Dziękujemy!",
-		"donateLink": "wsparcie"
+		"multipleFiles": "{{count}} plików"
 	},
 	"errors": {
 		"sharingFailed": "Nie udało się udostępnić",

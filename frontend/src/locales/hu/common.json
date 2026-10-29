@@ -192,6 +192,8 @@
 		"progress": "Átvitel állapota",
 		"speed": "Sebesség",
 		"eta": "Becs",
+		"chunks": "Darabok ({{size}})",
+		"concurrency": "Párhuzamosság",
 		"timeRemaining": "Hátralévő idő",
 		"calculating": "Kiszámítás...",
 		"complete": "Átvitel kész!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Letöltési útvonal",
 		"duration": "Időtartam",
 		"avgSpeed": "Átlag sebesség",
-		"multipleFiles": "{{count}} fájl",
-		"donatePrompt": "Ha tetszett a tapasztalat, kérjük, fontolja meg a {{link}}. Köszönjük!",
-		"donateLink": "adományozást"
+		"multipleFiles": "{{count}} fájl"
 	},
 	"errors": {
 		"sharingFailed": "Sikertelen megosztás",

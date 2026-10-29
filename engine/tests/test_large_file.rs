@@ -83,9 +83,13 @@ async fn e2e_progress_events_emitted() {
         let parts: Vec<&str> = payload.split(':').collect();
         assert_eq!(
             parts.len(),
-            3,
-            "progress payload must be '<bytes_transferred>:<total_bytes>:<speed>', got: {}",
+            4,
+            "progress payload must be '<bytes_transferred>:<total_bytes>:<speed>:<concurrency>', got: {}",
             payload
+        );
+        assert!(
+            parts[3].parse::<usize>().is_ok_and(|c| c >= 1),
+            "concurrency must be at least 1, got: {payload}"
         );
     }
 

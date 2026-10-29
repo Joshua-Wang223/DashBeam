@@ -192,6 +192,8 @@
 		"progress": "Прогресс Передачи",
 		"speed": "Скорость",
 		"eta": "ETA",
+		"chunks": "Блоки ({{size}})",
+		"concurrency": "Параллельность",
 		"timeRemaining": "Осталось времени",
 		"calculating": "Расчёт...",
 		"complete": "Передача завершена!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Путь для скачивания",
 		"duration": "Длительность",
 		"avgSpeed": "Средняя скорость",
-		"multipleFiles": "{{count}} файлов",
-		"donatePrompt": "Если вам понравился опыт, пожалуйста, подумайте о {{link}}. Спасибо!",
-		"donateLink": "пожертвовании"
+		"multipleFiles": "{{count}} файлов"
 	},
 	"errors": {
 		"sharingFailed": "Ошибка передачи",

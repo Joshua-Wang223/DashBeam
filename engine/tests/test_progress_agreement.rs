@@ -7,10 +7,12 @@ mod common;
 use common::{MockEventEmitter, TestFixture};
 use engine::{download, start_share, ReceiveOptions, SendOptions};
 
-/// `<bytes>:<total>:<speed x1000>`
+/// `<bytes>:<total>:<speed x1000>:<concurrency>`
 fn parse_progress(payload: &str) -> (u64, u64, f64) {
     let parts: Vec<&str> = payload.split(':').collect();
-    assert_eq!(parts.len(), 3, "unexpected progress payload: {payload}");
+    assert_eq!(parts.len(), 4, "unexpected progress payload: {payload}");
+    let concurrency = parts[3].parse::<usize>().expect("concurrency");
+    assert!(concurrency >= 1, "concurrency must be at least 1");
     (
         parts[0].parse().expect("bytes"),
         parts[1].parse().expect("total"),

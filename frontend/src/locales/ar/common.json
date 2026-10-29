@@ -192,6 +192,8 @@
 		"progress": "تقدم النقل",
 		"speed": "السرعة",
 		"eta": "ETA",
+		"chunks": "الكتل ({{size}})",
+		"concurrency": "التزامن",
 		"timeRemaining": "الوقت المتبقي",
 		"calculating": "جارٍ الحساب...",
 		"complete": "اكتمل النقل!",
@@ -210,9 +212,7 @@
 		"downloadPath": "مسار التنزيل",
 		"duration": "المدة",
 		"avgSpeed": "متوسط السرعة",
-		"multipleFiles": "{{count}} ملفات",
-		"donatePrompt": "إذا أعجبتك التجربة، يُرجى التفكير في {{link}}. شكرًا!",
-		"donateLink": "التبرع"
+		"multipleFiles": "{{count}} ملفات"
 	},
 	"errors": {
 		"sharingFailed": "فشل المشاركة",

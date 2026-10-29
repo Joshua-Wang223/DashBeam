@@ -53,12 +53,17 @@ fn emit_progress_event(
     bytes_transferred: u64,
     total_bytes: u64,
     speed_bps: f64,
+    concurrency: usize,
 ) {
     if let Some(handle) = app_handle {
         let event_name = "receive-progress";
 
-        let payload =
-            crate::progress::format_progress_payload(bytes_transferred, total_bytes, speed_bps);
+        let payload = crate::progress::format_progress_payload(
+            bytes_transferred,
+            total_bytes,
+            speed_bps,
+            concurrency,
+        );
 
         // Emit the event with appropriate payload
         if let Err(e) = handle.emit_event_with_payload(event_name, &payload) {
@@ -248,7 +253,7 @@ async fn download_sequential(
     let payload_size = split.payload_bytes;
     let total_files = (sizes.len().saturating_sub(1)) as u64;
 
-    emit_progress_event(app_handle, 0, payload_size, 0.0);
+    emit_progress_event(app_handle, 0, payload_size, 0.0, 1);
 
     let get = db.remote().execute_get(connection, local.missing());
     let mut stats = Stats::default();
@@ -272,6 +277,7 @@ async fn download_sequential(
                         received,
                         payload_size,
                         speed.bytes_per_sec_at(elapsed),
+                        1,
                     );
                 }
             }
@@ -286,6 +292,7 @@ async fn download_sequential(
                     payload_size,
                     payload_size,
                     speed.bytes_per_sec_at(elapsed),
+                    1,
                 );
 
                 break;
@@ -560,7 +567,7 @@ async fn download_parallel(
     let payload_size = split.payload_bytes;
     let total_files = sizes.len().saturating_sub(1) as u64;
 
-    emit_progress_event(app_handle, 0, payload_size, 0.0);
+    emit_progress_event(app_handle, 0, payload_size, 0.0, 1);
 
     // Chunk-level resume: a partial store is finished over a single stream,
     // where `local.missing()` asks for exactly the chunks still absent. The
@@ -626,7 +633,7 @@ async fn download_parallel(
 
     if tasks.is_empty() {
         let elapsed_ms = duration_ms(0.0);
-        emit_progress_event(app_handle, payload_size, payload_size, 0.0);
+        emit_progress_event(app_handle, payload_size, payload_size, 0.0, 1);
         return Ok((Stats::default(), total_files, payload_size, elapsed_ms));
     }
 
@@ -686,6 +693,10 @@ async fn download_parallel(
             break;
         }
 
+        // Snapshot before `select!` pins `in_flight.next()` mutably; it still
+        // tracks the live fan-out because new tasks are only spawned above.
+        let active_streams = in_flight.len().max(1);
+
         tokio::select! {
             biased;
 
@@ -702,6 +713,7 @@ async fn download_parallel(
                         done,
                         payload_size,
                         speed.bytes_per_sec_at(elapsed),
+                        active_streams,
                     );
                 }
             }
@@ -730,6 +742,7 @@ async fn download_parallel(
                         done,
                         payload_size,
                         speed.bytes_per_sec_at(elapsed),
+                        active_streams,
                     );
                 }
             }
@@ -761,6 +774,7 @@ async fn download_parallel(
         payload_size,
         payload_size,
         speed.bytes_per_sec_at(elapsed),
+        1,
     );
 
     Ok((total_stats, total_files, payload_size, elapsed_ms))

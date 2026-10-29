@@ -192,6 +192,8 @@
 		"progress": "پیشرفت انتقال",
 		"speed": "سرعت",
 		"eta": "ETA",
+		"chunks": "قطعه‌ها ({{size}})",
+		"concurrency": "هم‌زمانی",
 		"timeRemaining": "زمان باقی‌مانده",
 		"calculating": "در حال محاسبه...",
 		"complete": "انتقال کامل شد!",
@@ -210,9 +212,7 @@
 		"downloadPath": "مسیر ذخیره",
 		"duration": "مدت زمان",
 		"avgSpeed": "میانگین سرعت",
-		"multipleFiles": "{{count}} فایل",
-		"donatePrompt": "اگر از تجربه لذت بردید، لطفاً {{link}} را در نظر بگیرید. متشکریم!",
-		"donateLink": "حمایت مالی"
+		"multipleFiles": "{{count}} فایل"
 	},
 	"errors": {
 		"sharingFailed": "خطا در اشتراک‌گذاری",

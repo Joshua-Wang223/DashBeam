@@ -192,6 +192,8 @@
 		"progress": "ट्रांसफ़र प्रगति",
 		"speed": "गति",
 		"eta": "ETA",
+		"chunks": "खंड ({{size}})",
+		"concurrency": "समवर्तीता",
 		"timeRemaining": "शेष समय",
 		"calculating": "गणना की जा रही है...",
 		"complete": "ट्रांसफ़र पूरा!",
@@ -210,9 +212,7 @@
 		"downloadPath": "डाउनलोड पथ",
 		"duration": "अवधि",
 		"avgSpeed": "औसत गति",
-		"multipleFiles": "{{count}} फ़ाइलें",
-		"donatePrompt": "अगर अनुभव पसंद आया, तो कृपया {{link}} पर विचार करें। धन्यवाद!",
-		"donateLink": "दान करने"
+		"multipleFiles": "{{count}} फ़ाइलें"
 	},
 	"errors": {
 		"sharingFailed": "साझा करना विफल",

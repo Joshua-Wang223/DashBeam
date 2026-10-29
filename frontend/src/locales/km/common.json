@@ -192,6 +192,8 @@
 		"progress": "វឌ្ឍនភាពនៃការផ្ទេរ",
 		"speed": "ល្បឿន",
 		"eta": "ពេលវេលាដល់ទីបញ្ចប់",
+		"chunks": "ប្លុក ({{size}})",
+		"concurrency": "ចំនួនស្របគ្នា",
 		"timeRemaining": "ពេលវេលាសល់",
 		"calculating": "កំពុងគណនា...",
 		"complete": "ការផ្ទេរបានបញ្ចប់!",
@@ -210,9 +212,7 @@
 		"downloadPath": "ទីតាំងទាញយក",
 		"duration": "រយៈពេល",
 		"avgSpeed": "ល្បឿនមធ្យម",
-		"multipleFiles": "{{count}} ឯកសារ",
-		"donatePrompt": "បើអ្នកចូលចិត្តបទពិសោធន៍នេះ សូមពិចារណា{{link}}។ អរគុណ!",
-		"donateLink": "បរិច្ចាគ"
+		"multipleFiles": "{{count}} ឯកសារ"
 	},
 	"errors": {
 		"sharingFailed": "ការចែករំលែកបរាជ័យ",

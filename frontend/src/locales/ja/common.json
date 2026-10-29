@@ -192,6 +192,8 @@
 		"progress": "転送の進行状況",
 		"speed": "速度",
 		"eta": "ETA",
+		"chunks": "チャンク ({{size}})",
+		"concurrency": "並列数",
 		"timeRemaining": "残り時間",
 		"calculating": "計算中...",
 		"complete": "転送完了！",
@@ -210,9 +212,7 @@
 		"downloadPath": "ダウンロードパス",
 		"duration": "所要時間",
 		"avgSpeed": "平均速度",
-		"multipleFiles": "{{count}} 件のファイル",
-		"donatePrompt": "この体験が気に入ったら、ぜひ{{link}}をご検討ください。ありがとうございます！",
-		"donateLink": "寄付"
+		"multipleFiles": "{{count}} 件のファイル"
 	},
 	"errors": {
 		"sharingFailed": "共有に失敗しました",

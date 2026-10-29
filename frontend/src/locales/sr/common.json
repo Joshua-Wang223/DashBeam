@@ -192,6 +192,8 @@
 		"progress": "Напредак преноса",
 		"speed": "Брзина",
 		"eta": "ETA",
+		"chunks": "Blokovi ({{size}})",
+		"concurrency": "Paralelnost",
 		"timeRemaining": "Преостало време",
 		"calculating": "Рачунам...",
 		"complete": "Пренос је завршен!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Путања за преузимање",
 		"duration": "Трајање",
 		"avgSpeed": "Просечна брзина",
-		"multipleFiles": "{{count}} datoteka",
-		"donatePrompt": "Ako vam se dopao doživljaj, razmislite o {{link}}. Hvala!",
-		"donateLink": "donaciji"
+		"multipleFiles": "{{count}} datoteka"
 	},
 	"errors": {
 		"sharingFailed": "Дељење није успело",

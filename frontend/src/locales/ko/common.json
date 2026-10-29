@@ -192,6 +192,8 @@
 		"progress": "전송 진행률",
 		"speed": "속도",
 		"eta": "ETA",
+		"chunks": "청크 ({{size}})",
+		"concurrency": "동시성",
 		"timeRemaining": "남은 시간",
 		"calculating": "계산 중...",
 		"complete": "전송 완료!",
@@ -210,9 +212,7 @@
 		"downloadPath": "다운로드 경로",
 		"duration": "소요 시간",
 		"avgSpeed": "평균 속도",
-		"multipleFiles": "파일 {{count}}개",
-		"donatePrompt": "경험이 마음에 드셨다면 {{link}}을 고려해 주세요. 감사합니다!",
-		"donateLink": "기부"
+		"multipleFiles": "파일 {{count}}개"
 	},
 	"errors": {
 		"sharingFailed": "공유 실패",

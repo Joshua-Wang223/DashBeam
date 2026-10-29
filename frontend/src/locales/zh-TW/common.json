@@ -192,6 +192,8 @@
 		"progress": "傳輸進度",
 		"speed": "速度",
 		"eta": "ETA",
+		"chunks": "分塊 ({{size}})",
+		"concurrency": "並發",
 		"timeRemaining": "剩餘時間",
 		"calculating": "計算中...",
 		"complete": "傳輸完成！",
@@ -210,9 +212,7 @@
 		"downloadPath": "下載路徑",
 		"duration": "持續時間",
 		"avgSpeed": "平均速度",
-		"multipleFiles": "{{count}} 個檔案",
-		"donatePrompt": "如果喜歡這次體驗，請考慮{{link}}。謝謝！",
-		"donateLink": "捐贈"
+		"multipleFiles": "{{count}} 個檔案"
 	},
 	"errors": {
 		"sharingFailed": "分享失敗",

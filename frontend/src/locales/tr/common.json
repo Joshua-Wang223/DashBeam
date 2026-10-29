@@ -192,6 +192,8 @@
 		"progress": "Transfer Süreci",
 		"speed": "Hız",
 		"eta": "ETA",
+		"chunks": "Parçalar ({{size}})",
+		"concurrency": "Eşzamanlılık",
 		"timeRemaining": "Kalan Süre",
 		"calculating": "Hesaplanıyor...",
 		"complete": "Transfer Tamamlandı!",
@@ -210,9 +212,7 @@
 		"downloadPath": "İndirme yolu",
 		"duration": "Süre",
 		"avgSpeed": "Ort. Hız",
-		"multipleFiles": "{{count}} dosya",
-		"donatePrompt": "Deneyimi beğendiyseniz, lütfen {{link}}'i düşünün. Teşekkürler!",
-		"donateLink": "bağış yapmayı"
+		"multipleFiles": "{{count}} dosya"
 	},
 	"errors": {
 		"sharingFailed": "Paylaşım Başarısız",

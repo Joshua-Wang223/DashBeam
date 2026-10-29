@@ -131,11 +131,17 @@ fn emit_progress_event(
     bytes_transferred: u64,
     total_size: u64,
     speed_bps: f64,
+    concurrency: usize,
 ) {
     if let Some(handle) = app_handle {
         let event_name = "transfer-progress";
 
-        let payload = crate::progress::format_progress_payload(bytes_transferred, total_size, speed_bps);
+        let payload = crate::progress::format_progress_payload(
+            bytes_transferred,
+            total_size,
+            speed_bps,
+            concurrency,
+        );
         if let Err(e) = handle.emit_event_with_payload(event_name, &payload) {
             tracing::warn!("Failed to emit progress event: {}", e);
         }
@@ -338,6 +344,7 @@ fn emit_session_progress(app_handle: &AppHandle, session: &SessionProgress, at_s
         snapshot.bytes,
         snapshot.total,
         session.speed.bytes_per_sec_at(at_secs),
+        session.ledger.active_requests(),
     );
 }
 

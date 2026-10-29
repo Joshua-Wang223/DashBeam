@@ -192,6 +192,8 @@
 		"progress": "Průběh přenosu",
 		"speed": "Rychlost",
 		"eta": "ETA",
+		"chunks": "Bloky ({{size}})",
+		"concurrency": "Souběžnost",
 		"timeRemaining": "Zbývající čas",
 		"calculating": "Počítá se...",
 		"complete": "Přenos dokončen!",
@@ -210,9 +212,7 @@
 		"downloadPath": "Cesta pro uložení",
 		"duration": "Doba trvání",
 		"avgSpeed": "Průměrná rychlost",
-		"multipleFiles": "{{count}} souborů",
-		"donatePrompt": "Pokud se vám zkušenost líbí, zvažte prosím {{link}}. Děkujeme!",
-		"donateLink": "příspěvek"
+		"multipleFiles": "{{count}} souborů"
 	},
 	"errors": {
 		"sharingFailed": "Sdílení selhalo",
