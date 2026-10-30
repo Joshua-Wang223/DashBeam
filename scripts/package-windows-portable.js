@@ -17,10 +17,10 @@
  *   GITHUB_TOKEN  – used by `gh` for upload
  */
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -134,27 +134,51 @@ function stageResources(releaseDir, stagingAppDir) {
 	const confPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json')
 	const conf = JSON.parse(fs.readFileSync(confPath, 'utf8'))
 	const resourceEntries = conf?.bundle?.resources
-	if (!Array.isArray(resourceEntries) || resourceEntries.length === 0) {
+	const srcTauri = path.join(repoRoot, 'src-tauri')
+	let copied = 0
+
+	if (Array.isArray(resourceEntries)) {
+		for (const entry of resourceEntries) {
+			if (typeof entry !== 'string') {
+				throw new Error(
+					`Unsupported bundle.resources entry (expected string path): ${JSON.stringify(entry)}`
+				)
+			}
+			const from = path.join(srcTauri, entry)
+			if (!fs.existsSync(from) || !fs.statSync(from).isFile()) {
+				throw new Error(`bundle.resources file missing: ${from}`)
+			}
+			copyFile(from, path.join(stagedResources, entry))
+			copied += 1
+		}
+	} else if (resourceEntries && typeof resourceEntries === 'object') {
+		for (const [entry, target] of Object.entries(resourceEntries)) {
+			if (typeof target !== 'string' || target.length === 0) {
+				throw new Error(
+					`Unsupported bundle.resources mapping for ${entry}: ${JSON.stringify(target)}`
+				)
+			}
+			const from = path.join(srcTauri, entry)
+			if (!fs.existsSync(from) || !fs.statSync(from).isFile()) {
+				throw new Error(`bundle.resources file missing: ${from}`)
+			}
+			copyFile(from, path.join(stagingAppDir, target))
+			copied += 1
+		}
+	} else {
 		throw new Error(
 			`No resources/ next to the exe and no bundle.resources in ${confPath}`
 		)
 	}
 
-	const srcTauri = path.join(repoRoot, 'src-tauri')
-	for (const entry of resourceEntries) {
-		if (typeof entry !== 'string') {
-			throw new Error(
-				`Unsupported bundle.resources entry (expected string path): ${JSON.stringify(entry)}`
-			)
-		}
-		const from = path.join(srcTauri, entry)
-		if (!fs.existsSync(from) || !fs.statSync(from).isFile()) {
-			throw new Error(`bundle.resources file missing: ${from}`)
-		}
-		copyFile(from, path.join(stagedResources, entry))
+	const appIcon = path.join(srcTauri, 'icons', 'icon.ico')
+	if (fs.existsSync(appIcon)) {
+		copyFile(appIcon, path.join(stagedResources, 'icon.ico'))
+		copied += 1
 	}
+
 	console.log(
-		`Assembled resources/ from src-tauri (${resourceEntries.length} file(s); Tauri did not leave resources/ under ${releaseDir})`
+		`Assembled resources from src-tauri (${copied} file(s); Tauri did not leave resources/ under ${releaseDir})`
 	)
 }
 
@@ -178,9 +202,17 @@ function stagePortablePayload(releaseDir, stagingAppDir) {
 		)
 	}
 
-	const loader = path.join(releaseDir, 'WebView2Loader.dll')
-	if (fs.existsSync(loader)) {
+	const loaderCandidates = [
+		path.join(releaseDir, 'WebView2Loader.dll'),
+		path.join(repoRoot, 'src-tauri', 'resources', 'WebView2Loader.dll'),
+	]
+	const loader = loaderCandidates.find((candidate) => fs.existsSync(candidate))
+	if (loader) {
 		copyFile(loader, path.join(stagingAppDir, 'WebView2Loader.dll'))
+	} else {
+		console.warn(
+			'WebView2Loader.dll not found; relying on the system WebView2 runtime'
+		)
 	}
 
 	stageResources(releaseDir, stagingAppDir)

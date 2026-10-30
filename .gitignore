@@ -1,4 +1,6 @@
 # Rust build artifacts
+src-tauri/resources/
+
 /target
 **/target
 

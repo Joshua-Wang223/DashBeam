@@ -354,7 +354,7 @@ impl EventEmitter for HistoryRecordingEmitter {
     }
 }
 
-/// `<bytes>:<total>:<speed x1000>` — the shared progress payload shape.
+/// `<bytes>:<total>:<speed x1000>:<concurrency>` — the shared progress payload shape.
 fn progress_bytes(payload: &str) -> Option<u64> {
     payload.split(':').next()?.parse::<u64>().ok()
 }
