@@ -267,6 +267,20 @@ export async function respondNearbyInvite(
 	await invoke('respond_nearby_invite', { endpointId, accept, block })
 }
 
+/**
+ * Accepts/declines a post-transfer pairing request. The session id comes from
+ * the `nearby-pair-request-received` payload and is echoed back in the
+ * `InviteResponse` so a late reply cannot pair a newer request.
+ */
+export async function respondPairRequest(
+	endpointId: string,
+	sessionId: string,
+	accept: boolean
+): Promise<void> {
+	if (!pairingCapable()) return
+	await invoke('respond_pair_request', { endpointId, sessionId, accept })
+}
+
 export function formatOsLabel(os: string | undefined | null): string {
 	switch ((os ?? '').toLowerCase()) {
 		case 'macos':
