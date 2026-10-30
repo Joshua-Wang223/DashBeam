@@ -12,7 +12,24 @@ test('parses a progress payload into bytes, total and speed', () => {
 		speedBps: 1536,
 		percentage: 50,
 		etaSeconds: 500 / 1536,
+		concurrency: undefined,
 	})
+})
+
+test('reads the concurrency the engine reports for the transfer', () => {
+	const progress = parseProgressPayload('500:1000:1536000:8')
+	assert.equal(progress?.concurrency, 8)
+})
+
+test('ignores a concurrency field that is not a usable stream count', () => {
+	assert.equal(
+		parseProgressPayload('500:1000:1536000:0')?.concurrency,
+		undefined
+	)
+	assert.equal(
+		parseProgressPayload('500:1000:1536000:x')?.concurrency,
+		undefined
+	)
 })
 
 test('reports no eta when the transfer is stalled', () => {
@@ -32,7 +49,7 @@ test('treats a negative speed as zero rather than a negative eta', () => {
 	assert.equal(progress?.etaSeconds, undefined)
 })
 
-test('rejects a payload that is not three fields', () => {
+test('rejects a payload with fewer than three fields', () => {
 	assert.equal(parseProgressPayload('500:1000'), null)
 	assert.equal(parseProgressPayload('nonsense'), null)
 })

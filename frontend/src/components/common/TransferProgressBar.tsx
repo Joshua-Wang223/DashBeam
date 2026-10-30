@@ -1,6 +1,15 @@
 import { useTranslation } from '../../i18n/react-i18next-compat'
+import { formatFileSize } from '../../lib/utils'
 import type { TransferProgress } from '../../types/transfer'
 import { formatETA } from '../../utils/etaUtils'
+
+/** BLAKE3 chunk size — the addressing unit the engine transfers in. */
+const TRANSFER_CHUNK_BYTES = 1024
+
+const compactNumber = new Intl.NumberFormat(undefined, {
+	notation: 'compact',
+	maximumFractionDigits: 1,
+})
 
 interface TransferProgressBarProps {
 	progress: TransferProgress
@@ -128,6 +137,24 @@ export function TransferProgressBar({ progress }: TransferProgressBarProps) {
 	const { t } = useTranslation()
 	const filledBars = Math.floor((percentage / 100) * barCount)
 
+	const chunkSizeLabel = formatFileSize(TRANSFER_CHUNK_BYTES, {
+		precision: 0,
+		smallPrecision: 0,
+	})
+	const totalChunks =
+		progress.totalBytes > 0
+			? Math.ceil(progress.totalBytes / TRANSFER_CHUNK_BYTES)
+			: 0
+	const chunksTransferred = Math.min(
+		Math.floor(progress.bytesTransferred / TRANSFER_CHUNK_BYTES),
+		totalChunks
+	)
+	const etaLabel =
+		progress.etaSeconds !== undefined
+			? formatETA(progress.etaSeconds)
+			: t('common:transfer.calculating')
+	const concurrency = progress.concurrency ?? 1
+
 	return (
 		<div className="space-y-3">
 			<div className="sm:hidden flex flex-col items-center gap-3">
@@ -145,11 +172,6 @@ export function TransferProgressBar({ progress }: TransferProgressBarProps) {
 							{(progress.bytesTransferred / (1024 * 1024)).toFixed(2)} /{' '}
 							{(progress.totalBytes / (1024 * 1024)).toFixed(2)} MB
 						</span>
-						{progress.etaSeconds !== undefined && (
-							<span className="text-xs text-muted-foreground">
-								{t('common:transfer.eta')}: {formatETA(progress.etaSeconds)}
-							</span>
-						)}
 					</div>
 				</div>
 			</div>
@@ -202,14 +224,43 @@ export function TransferProgressBar({ progress }: TransferProgressBarProps) {
 						{(progress.totalBytes / (1024 * 1024)).toFixed(2)} MB
 					</span>
 				</div>
-
-				{progress.etaSeconds !== undefined && (
-					<div className="flex items-center justify-start text-xs text-muted-foreground">
-						<span className="mr-1">{t('common:transfer.eta')}:</span>
-						<span>{formatETA(progress.etaSeconds)}</span>
-					</div>
-				)}
 			</div>
+
+			<div className="grid grid-cols-3 gap-2 sm:gap-4">
+				<TelemetryItem
+					label={t('common:transfer.eta')}
+					value={etaLabel}
+					title={etaLabel}
+				/>
+				<TelemetryItem
+					label={t('common:transfer.chunks', { size: chunkSizeLabel })}
+					value={`${compactNumber.format(chunksTransferred)} / ${compactNumber.format(totalChunks)}`}
+					title={`${chunksTransferred.toLocaleString()} / ${totalChunks.toLocaleString()}`}
+				/>
+				<TelemetryItem
+					label={t('common:transfer.concurrency')}
+					value={String(concurrency)}
+				/>
+			</div>
+		</div>
+	)
+}
+
+interface TelemetryItemProps {
+	label: string
+	value: string
+	title?: string
+}
+
+function TelemetryItem({ label, value, title }: TelemetryItemProps) {
+	return (
+		<div className="flex min-w-0 flex-col gap-0.5" title={title}>
+			<span className="truncate text-[10px] uppercase tracking-wide text-muted-foreground/70">
+				{label}
+			</span>
+			<span className="truncate text-xs font-medium tabular-nums text-foreground/80">
+				{value}
+			</span>
 		</div>
 	)
 }

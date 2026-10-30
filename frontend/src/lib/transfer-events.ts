@@ -1,7 +1,8 @@
 /**
  * Parsing for the engine's transfer telemetry. Sender and receiver share the
- * `<bytes>:<total>:<speed x1000>` payload and the engine measures both the same
- * way, so the UI must not re-derive or re-smooth them.
+ * `<bytes>:<total>:<speed x1000>:<concurrency>` payload and the engine measures
+ * both the same way, so the UI must not re-derive or re-smooth them. The
+ * fourth field is optional so older engines keep working.
  */
 
 export type TransferProgressUpdate = {
@@ -10,6 +11,8 @@ export type TransferProgressUpdate = {
 	speedBps: number
 	percentage: number
 	etaSeconds?: number
+	/** Parallel streams the engine currently has in flight. */
+	concurrency?: number
 }
 
 export type TransferCompletion = {
@@ -29,7 +32,7 @@ export function parseProgressPayload(
 	payload: string
 ): TransferProgressUpdate | null {
 	const parts = payload.split(':')
-	if (parts.length !== 3) {
+	if (parts.length < 3) {
 		return null
 	}
 
@@ -50,6 +53,11 @@ export function parseProgressPayload(
 	const bytesRemaining = Math.max(totalBytes - bytesTransferred, 0)
 	const etaSeconds =
 		speedBps > 0 && bytesRemaining > 0 ? bytesRemaining / speedBps : undefined
+	const parsedConcurrency = Number.parseInt(parts[3], 10)
+	const concurrency =
+		Number.isFinite(parsedConcurrency) && parsedConcurrency >= 1
+			? parsedConcurrency
+			: undefined
 
 	return {
 		bytesTransferred,
@@ -57,6 +65,7 @@ export function parseProgressPayload(
 		speedBps,
 		percentage,
 		etaSeconds,
+		concurrency,
 	}
 }
 
