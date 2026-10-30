@@ -52,6 +52,12 @@ export type AppSettingsState = {
 	 * Existing rows are left alone — disabling is not clearing.
 	 */
 	enableTransferHistory: boolean
+	/**
+	 * Senders whose post-transfer pairing prompt was dismissed. Persisted so
+	 * the same device is not asked again on the next transfer; pairing stays
+	 * available from the Devices screen.
+	 */
+	dismissedPairPrompts: string[]
 }
 
 export type AppSettingsActions = {
@@ -76,6 +82,10 @@ export type AppSettingsActions = {
 	setDiscoverability: (value: 'everyone' | 'paired-only' | 'off') => void
 	setAutostartInitialized: (value: boolean) => void
 	setEnableTransferHistory: (value: boolean) => void
+	/** Stop offering the post-transfer pairing prompt for this sender. */
+	rememberDismissedPairPrompt: (endpointId: string) => void
+	/** Pairing or unpairing makes the sender eligible for a prompt again. */
+	clearDismissedPairPrompt: (endpointId: string) => void
 }
 
 export type AppSettings = AppSettingsState & AppSettingsActions
@@ -152,6 +162,33 @@ export const useAppSettingStore = create<AppSettings>()(
 				set({ autostartInitialized: value }),
 			setEnableTransferHistory: (value: boolean) =>
 				set({ enableTransferHistory: value }),
+			rememberDismissedPairPrompt: (endpointId: string) =>
+				set((state) => {
+					// Defensive: a tampered/older settings file may not have the array.
+					const dismissed = Array.isArray(state.dismissedPairPrompts)
+						? state.dismissedPairPrompts
+						: []
+					if (dismissed.includes(endpointId)) {
+						return {}
+					}
+					// Bounded: dismissing many one-off senders must not grow the
+					// settings file forever.
+					return {
+						dismissedPairPrompts: [...dismissed, endpointId].slice(-100),
+					}
+				}),
+			clearDismissedPairPrompt: (endpointId: string) =>
+				set((state) => {
+					const dismissed = Array.isArray(state.dismissedPairPrompts)
+						? state.dismissedPairPrompts
+						: []
+					if (!dismissed.includes(endpointId)) {
+						return {}
+					}
+					return {
+						dismissedPairPrompts: dismissed.filter((id) => id !== endpointId),
+					}
+				}),
 		}),
 		{
 			name: AppSettingsKey,
