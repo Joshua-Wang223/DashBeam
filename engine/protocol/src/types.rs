@@ -25,6 +25,13 @@ pub struct SendOptions {
     pub magic_ipv6_addr: Option<std::net::SocketAddrV6>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum SplitStrategy {
+    #[default]
+    None,
+    Split,
+}
+
 #[derive(Debug, Default)]
 pub struct ReceiveOptions {
     pub output_dir: Option<std::path::PathBuf>,
@@ -32,6 +39,11 @@ pub struct ReceiveOptions {
     pub discovery_mode: DiscoveryModeOption,
     pub magic_ipv4_addr: Option<std::net::SocketAddrV4>,
     pub magic_ipv6_addr: Option<std::net::SocketAddrV6>,
+    /// Whether to use parallel (split) downloads for large transfers.
+    pub split_strategy: SplitStrategy,
+    /// Maximum number of concurrent connections/blobs for parallel downloads.
+    /// Defaults to 16 for split strategy, ignored for sequential.
+    pub max_concurrency: Option<usize>,
 }
 
 #[derive(Clone, Debug)]

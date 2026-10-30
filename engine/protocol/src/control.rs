@@ -54,6 +54,9 @@ pub enum ControlMessage {
     /// Accept replies with `InviteResponse` and both sides commit records, as a
     /// nearby file-invite accept does.
     PairRequest {
+        /// Correlates the eventual `InviteResponse`. Optional for older peers.
+        #[serde(default)]
+        session_id: String,
         sender_name: String,
         device_type: String,
         #[serde(default)]
@@ -308,6 +311,7 @@ mod nearby_message_tests {
                 os: String::new(),
             },
             ControlMessage::PairRequest {
+                session_id: String::new(),
                 sender_name: String::new(),
                 device_type: String::new(),
                 os: String::new(),

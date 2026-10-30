@@ -289,8 +289,22 @@ impl EmitThrottle {
 }
 
 /// Wire format shared by `transfer-progress` and `receive-progress`.
-pub fn format_progress_payload(bytes: u64, total: u64, speed_bps: f64) -> String {
-    format!("{}:{}:{}", bytes, total, (speed_bps * 1000.0) as i64)
+///
+/// The fourth field is the number of streams the engine currently has in
+/// flight, so the UI can show live parallelism instead of inferring it.
+pub fn format_progress_payload(
+    bytes: u64,
+    total: u64,
+    speed_bps: f64,
+    concurrency: usize,
+) -> String {
+    format!(
+        "{}:{}:{}:{}",
+        bytes,
+        total,
+        (speed_bps * 1000.0) as i64,
+        concurrency.max(1)
+    )
 }
 
 #[cfg(test)]
@@ -653,6 +667,14 @@ mod tests {
 
     #[test]
     fn progress_payload_is_colon_separated_with_fixed_point_speed() {
-        assert_eq!(format_progress_payload(10, 100, 1.5), "10:100:1500");
+        assert_eq!(
+            format_progress_payload(10, 100, 1.5, 8),
+            "10:100:1500:8"
+        );
+        assert_eq!(
+            format_progress_payload(0, 100, 0.0, 0),
+            "0:100:0:1",
+            "concurrency is never reported below one stream"
+        );
     }
 }

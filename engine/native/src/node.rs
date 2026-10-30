@@ -47,6 +47,10 @@ const UNPAIRED_DIRECT_PATH_DEADLINE: Duration = Duration::from_secs(3);
 
 /// Poll interval while waiting out [`UNPAIRED_DIRECT_PATH_DEADLINE`].
 const UNPAIRED_DIRECT_PATH_POLL: Duration = Duration::from_millis(100);
+/// Memory bound for unanswered pairing requests. Kept long so a slow manual
+/// approval on the other device still completes; the session id, not the
+/// timeout, is what prevents a stale reply from matching a newer request.
+const PAIR_REQUEST_TIMEOUT_SECS: u64 = 86_400;
 
 /// Waits up to [`UNPAIRED_DIRECT_PATH_DEADLINE`] for `conn` to have a direct
 /// (non-relay) path. Not a LAN check — a successful hole punch counts too —
@@ -144,6 +148,8 @@ struct PendingNearbyInvite {
     display_name: String,
     device_type: String,
     os: String,
+    /// Echoed by `InviteResponse` so a stale reply cannot pair a newer request.
+    session_id: String,
 }
 
 #[derive(Clone)]
@@ -567,6 +573,7 @@ impl ControlProtocol {
                 );
             }
             ControlMessage::PairRequest {
+                session_id,
                 sender_name,
                 device_type,
                 os,
@@ -574,12 +581,16 @@ impl ControlProtocol {
                 crate::pairing_util::emit_nearby_pair_request(
                     &self.ctx.app_handle,
                     &remote.to_string(),
+                    &session_id,
                     &sender_name,
                     &device_type,
                     &os,
                 );
             }
-            ControlMessage::InviteResponse { response, .. } => {
+            ControlMessage::InviteResponse {
+                session_id,
+                response,
+            } => {
                 // An unpaired peer could claim to be answering an invite we
                 // never sent, so match it against `pending_nearby_invites`.
                 // A decline creates no `PairedDevice`, so the pending snapshot
@@ -598,6 +609,20 @@ impl ControlProtocol {
                         );
                         return false;
                     };
+                    if !pending.session_id.is_empty()
+                        && !session_id.is_empty()
+                        && pending.session_id != session_id
+                    {
+                        tracing::debug!(
+                            "ignoring InviteResponse with a stale pairing session"
+                        );
+                        self.ctx
+                            .pending_nearby_invites
+                            .write()
+                            .await
+                            .insert(remote.to_string(), pending);
+                        return false;
+                    }
                     invited_name = Some(pending.display_name.clone());
                     // Mirrors `accept_nearby_invite` on the receiver's side;
                     // without it their presence connection back to us is
@@ -1170,6 +1195,135 @@ impl NodeService {
         Ok(())
     }
 
+    /// Cosmetic identity for a peer known only by address — a transfer sender
+    /// who may not be on the LAN. Self-reported fields are ignored unless the
+    /// reply's endpoint id matches the TLS-bound one; otherwise the fallback is
+    /// an id prefix with empty type/OS, never a placeholder name or this
+    /// device's own platform.
+    pub async fn peer_identity_at(&self, addr: iroh::EndpointAddr) -> DeviceInfo {
+        let endpoint_id = addr.id.to_string();
+        match self.probe_identity_at(addr).await {
+            Ok(info) if info.endpoint_id.eq_ignore_ascii_case(&endpoint_id) => info,
+            _ => DeviceInfo {
+                endpoint_id: endpoint_id.clone(),
+                display_name: endpoint_id.chars().take(8).collect(),
+                device_type: String::new(),
+                os: String::new(),
+            },
+        }
+    }
+
+    /// Dial a peer at a known address and ask who it is.
+    pub async fn probe_identity_at(
+        &self,
+        addr: iroh::EndpointAddr,
+    ) -> anyhow::Result<DeviceInfo> {
+        let endpoint = {
+            let runtime = self.runtime.lock().await;
+            runtime.endpoint.clone()
+        };
+        probe_identity_at_endpoint(&endpoint, addr).await
+    }
+
+    /// Ask a peer we only know from a transfer ticket to pair. Unlike
+    /// [`Self::request_nearby_pair`], the peer may not be on the LAN, so the
+    /// ticket's address supplies relay/direct hints.
+    ///
+    /// Nothing is stored locally here. The peer's user confirms in their own
+    /// UI; their `InviteResponse::Accepted` is matched against the pending
+    /// snapshot registered below and committed by
+    /// [`ControlProtocol::commit_nearby_pairing`], which writes the record,
+    /// allowlist entry, presence and `device-paired` event on both sides.
+    ///
+    /// The response is a fresh inbound connection, so it is only accepted under
+    /// discoverability `Everyone` — the same constraint the Nearby pairing flow
+    /// has. Under `PairedOnly`/`Off` only the peer's side can commit.
+    pub async fn request_pair_at(
+        &self,
+        addr: iroh::EndpointAddr,
+        peer: DeviceInfo,
+    ) -> anyhow::Result<bool> {
+        let remote = addr.id;
+        let endpoint = {
+            let runtime = self.runtime.lock().await;
+            runtime.endpoint.clone()
+        };
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let request = ControlMessage::PairRequest {
+            session_id: session_id.clone(),
+            sender_name: self.identity.display_name(),
+            device_type: self.identity.device_type(),
+            os: self.identity.os(),
+        };
+
+        // Register the snapshot before sending: the response handler only
+        // commits when it finds this entry, so an early reply must not race it.
+        self.pending_nearby_invites.write().await.insert(
+            remote.to_string(),
+            PendingNearbyInvite {
+                display_name: peer.display_name,
+                device_type: peer.device_type,
+                os: peer.os,
+                session_id: session_id.clone(),
+            },
+        );
+        self.arm_pairing_timeout(remote.to_string(), session_id);
+
+        let deliver = async {
+            let conn = endpoint.connect(addr, CONTROL_ALPN).await?;
+            let (mut send, _recv) = conn.open_bi().await?;
+            write_message(&mut send, &request).await?;
+
+            drop(send);
+            tokio::spawn(async move {
+                let _ = tokio::time::timeout(Duration::from_secs(15), conn.closed()).await;
+            });
+            anyhow::Ok(())
+        };
+
+        let delivered = match tokio::time::timeout(
+            Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
+            deliver,
+        )
+        .await
+        {
+            Ok(Ok(())) => true,
+            Ok(Err(err)) => {
+                tracing::warn!(%err, "pair request delivery failed");
+                false
+            }
+            Err(_) => false,
+        };
+
+        if !delivered {
+            // Leave no pending entry that a later, unrelated message could
+            // match against.
+            self.pending_nearby_invites
+                .write()
+                .await
+                .remove(&remote.to_string());
+        }
+        Ok(delivered)
+    }
+
+    /// Drop an unanswered pairing request after a bounded window. The
+    /// session id check keeps a late task from deleting a newer request.
+    fn arm_pairing_timeout(&self, endpoint_id: String, session_id: String) {
+        let pending = self.pending_nearby_invites.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(PAIR_REQUEST_TIMEOUT_SECS)).await;
+            let mut map = pending.write().await;
+            let stale = map
+                .get(&endpoint_id)
+                .map(|entry| entry.session_id == session_id)
+                .unwrap_or(false);
+            if stale {
+                map.remove(&endpoint_id);
+            }
+        });
+    }
+
     /// Immediate pairing code from local identity. Never waits on presence or
     /// relay probes — optional custom-relay hint is best-effort via try_lock.
     pub fn pairing_ticket(&self) -> anyhow::Result<String> {
@@ -1258,11 +1412,13 @@ impl NodeService {
                     .device_type
                     .unwrap_or_else(protocol::identity::default_device_type),
                 os: d.os.unwrap_or_default(),
+                session_id: String::new(),
             },
             None => PendingNearbyInvite {
                 display_name: endpoint_id.chars().take(8).collect(),
                 device_type: protocol::identity::default_device_type(),
                 os: String::new(),
+                session_id: String::new(),
             },
         };
         self.pending_nearby_invites
@@ -1286,7 +1442,8 @@ impl NodeService {
             .find(|d| d.endpoint_id == endpoint_id);
         anyhow::ensure!(nearby_device.is_some(), "device is not on the local network");
 
-        let delivered = self.deliver_pair_request(endpoint_id).await?;
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let delivered = self.deliver_pair_request(endpoint_id, &session_id).await?;
         if !delivered {
             return Ok(false);
         }
@@ -1300,17 +1457,20 @@ impl NodeService {
                     .device_type
                     .unwrap_or_else(protocol::identity::default_device_type),
                 os: d.os.unwrap_or_default(),
+                session_id: session_id.clone(),
             },
             None => PendingNearbyInvite {
                 display_name: endpoint_id.chars().take(8).collect(),
                 device_type: protocol::identity::default_device_type(),
                 os: String::new(),
+                session_id: session_id.clone(),
             },
         };
         self.pending_nearby_invites
             .write()
             .await
             .insert(endpoint_id.to_string(), pending);
+        self.arm_pairing_timeout(endpoint_id.to_string(), session_id);
 
         Ok(true)
     }
@@ -1416,7 +1576,11 @@ impl NodeService {
         Ok(true)
     }
 
-    async fn deliver_pair_request(&self, remote_endpoint_id: &str) -> anyhow::Result<bool> {
+    async fn deliver_pair_request(
+        &self,
+        remote_endpoint_id: &str,
+        session_id: &str,
+    ) -> anyhow::Result<bool> {
         let remote = EndpointId::from_str(remote_endpoint_id)?;
         let endpoint = {
             let runtime = self.runtime.lock().await;
@@ -1443,6 +1607,7 @@ impl NodeService {
         };
 
         let request = ControlMessage::PairRequest {
+            session_id: session_id.to_string(),
             sender_name: self.identity.display_name(),
             device_type: self.identity.device_type(),
             os: self.identity.os(),
@@ -1481,7 +1646,7 @@ impl NodeService {
             anyhow::bail!("unknown paired device");
         }
 
-        self.deliver_invite_response(remote_endpoint_id, accepted, true)
+        self.deliver_invite_response(remote_endpoint_id, accepted, true, "")
             .await
     }
 
@@ -1489,6 +1654,40 @@ impl NodeService {
     /// compared the fingerprint on screen — then notifies the sender via
     /// [`Self::deliver_invite_response`].
     pub async fn accept_nearby_invite(&self, endpoint_id: &str) -> anyhow::Result<()> {
+        // A nearby file invite keeps its record even if the sender has already
+        // gone away; the durable consequence is still useful.
+        self.accept_pairing(endpoint_id, "", false).await
+    }
+
+    /// Accept a post-transfer `PairRequest`.
+    ///
+    /// Unlike a nearby file invite this is a mutual handshake: if the sender
+    /// cannot receive `InviteResponse::Accepted`, the local record is rolled
+    /// back so one side cannot silently remain paired while the other does not.
+    pub async fn accept_pair_request(
+        &self,
+        endpoint_id: &str,
+        session_id: &str,
+    ) -> anyhow::Result<()> {
+        self.accept_pairing(endpoint_id, session_id, true).await
+    }
+
+    pub async fn decline_pair_request(
+        &self,
+        endpoint_id: &str,
+        session_id: &str,
+    ) -> anyhow::Result<()> {
+        self.deliver_invite_response(endpoint_id, false, false, session_id)
+            .await
+    }
+
+    async fn accept_pairing(
+        &self,
+        endpoint_id: &str,
+        session_id: &str,
+        require_delivery: bool,
+    ) -> anyhow::Result<()> {
+        let remote = EndpointId::from_str(endpoint_id)?;
         // The probe reply's `endpoint_id` is self-reported; only trust its
         // cosmetic fields, and only if the id matches the verified one.
         let info = nearby_peer_identity(endpoint_id, self.probe_identity(endpoint_id).await.ok());
@@ -1509,17 +1708,20 @@ impl NodeService {
 
         // Now that a paired record exists, it must not also show under Nearby.
         self.nearby.lock().await.expire(endpoint_id);
-        self.access.write().await.allowed.insert(endpoint_id.parse()?);
+        self.access.write().await.allowed.insert(remote);
 
         crate::pairing_util::emit_device_paired(&self.app_handle, &display_name);
 
-        // The pairing above is already durable, so notifying a sender that may
-        // have gone away must not report the accept as failed. No cached
-        // session either — we just met this peer.
-        //
         // Must precede `paired_connections.refresh()`, whose `Recognition` an
         // uncommitted sender closes as unpaired, reading as a remote unpair.
-        if let Err(err) = self.deliver_invite_response(endpoint_id, true, false).await {
+        if let Err(err) = self
+            .deliver_invite_response(endpoint_id, true, false, session_id)
+            .await
+        {
+            if require_delivery {
+                self.rollback_pairing(endpoint_id, remote).await;
+                return Err(err).context("pair response delivery failed");
+            }
             tracing::debug!(
                 "accepted nearby invite from {endpoint_id} but could not notify the sender: {err:#}"
             );
@@ -1534,6 +1736,29 @@ impl NodeService {
         Ok(())
     }
 
+    /// Undo a just-written pairing record when the peer never received the
+    /// acceptance. Nearby cleanup is not reversible, but discovery will add
+    /// the device back if it is still around.
+    async fn rollback_pairing(&self, endpoint_id: &str, remote: EndpointId) {
+        let _ = self.paired_store.forget(endpoint_id);
+        self.access.write().await.allowed.remove(&remote);
+        set_presence(
+            &self.presence,
+            &self.app_handle,
+            &self.paired_store,
+            endpoint_id,
+            false,
+        );
+        self.paired_connections.forget(endpoint_id).await;
+        if let Some(handle) = &self.app_handle {
+            let payload = serde_json::json!({
+                "endpoint_id": endpoint_id,
+                "reason": "local",
+            });
+            let _ = handle.emit_event_with_payload("device-unpaired", &payload.to_string());
+        }
+    }
+
     pub async fn decline_nearby_invite(
         &self,
         endpoint_id: &str,
@@ -1543,7 +1768,7 @@ impl NodeService {
             self.nearby.lock().await.expire(endpoint_id);
             self.blocked.write().await.insert(endpoint_id.to_string());
         }
-        self.deliver_invite_response(endpoint_id, false, false)
+        self.deliver_invite_response(endpoint_id, false, false, "")
             .await
     }
 
@@ -1556,6 +1781,7 @@ impl NodeService {
         remote_endpoint_id: &str,
         accepted: bool,
         use_cached_session: bool,
+        session_id: &str,
     ) -> anyhow::Result<()> {
         let remote = EndpointId::from_str(remote_endpoint_id)?;
         let response = if accepted {
@@ -1609,7 +1835,7 @@ impl NodeService {
             .await
             .context("open bi stream for invite response")?;
         let message = ControlMessage::InviteResponse {
-            session_id: String::new(),
+            session_id: session_id.to_string(),
             response,
         };
         write_message(&mut send, &message)
@@ -2076,9 +2302,18 @@ async fn probe_identity_via(
         let runtime = runtime.lock().await;
         runtime.endpoint.clone()
     };
+    probe_identity_at_endpoint(&endpoint, iroh::EndpointAddr::from(remote)).await
+}
+
+/// Ask a peer at a known address who it is. Address-based so a ticket sender
+/// that never published to discovery can still be resolved.
+async fn probe_identity_at_endpoint(
+    endpoint: &Endpoint,
+    addr: iroh::EndpointAddr,
+) -> anyhow::Result<DeviceInfo> {
     let conn = tokio::time::timeout(
         Duration::from_secs(5),
-        endpoint.connect(remote, CONTROL_ALPN),
+        endpoint.connect(addr, CONTROL_ALPN),
     )
     .await
     .context("identity probe timed out")??;
